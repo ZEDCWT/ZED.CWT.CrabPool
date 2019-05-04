@@ -1,0 +1,17 @@
+{
+	"name" : "@zed.cwt/crabpool",
+	"version" : "0.0.0",
+	"description" : "Yet Another Private Network Solution",
+	"main" : "Entry",
+	"repository" :
+	{
+		"type" : "git",
+		"url" : "git+https://github.com/ZEDCWT/ZED.CWT.CrabPool"
+	},
+	"author" : "ZED.CWT",
+	"license" : "MIT",
+	"dependencies" :
+	{
+		"@zed.cwt/wish" : ">=0.0.0"
+	}
+}
