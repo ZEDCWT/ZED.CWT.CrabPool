@@ -12,6 +12,6 @@
 	"license" : "MIT",
 	"dependencies" :
 	{
-		"@zed.cwt/wish" : ">=0.0.0"
+		"@zed.cwt/wish" : ">=0.0.2"
 	}
 }
