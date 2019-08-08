@@ -2,7 +2,7 @@
 	"name" : "@zed.cwt/crabpool",
 	"version" : "0.0.0",
 	"description" : "Yet Another Private Network Solution",
-	"main" : "Entry",
+	"main" : "CrabPool",
 	"repository" :
 	{
 		"type" : "git",
@@ -12,6 +12,11 @@
 	"license" : "MIT",
 	"dependencies" :
 	{
-		"@zed.cwt/wish" : ">=0.0.2"
+		"@zed.cwt/wish" : ">=0.0.2",
+		"log4js" : "^4.5.1"
+	},
+	"devDependencies" :
+	{
+		"request" : "^2.88.0"
 	}
 }
