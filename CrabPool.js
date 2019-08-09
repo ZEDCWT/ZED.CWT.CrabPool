@@ -206,8 +206,9 @@ module.exports = Option =>
 
 	//	Node
 	Online,
+	MakePipeLog,
 	MakePipe = (Q,S) => Wish.X.Just()
-		.FMap(() => Wish.X.IsProvider(Q = PipeMaster(Q)) ? Q : Wish.X.Just(Q))
+		.FMap(() => Wish.X.IsProvider(Q = PipeMaster(Q,MakePipeLog)) ? Q : Wish.X.Just(Q))
 		.FMap(M => Wish.X.Provider(O => S(M,O))),
 	MakeQBH = () =>
 	{
@@ -393,6 +394,7 @@ module.exports = Option =>
 		}).getLogger('O')
 		Log = Log.debug.bind(Log)
 	}
+	MakePipeLog = MakeLog('Pipe')
 
 	return Wish.N.MakeDir(PathLog)
 		.FMap(() => Wish.N.FileR(FileID))

@@ -9,7 +9,7 @@ declare module CrabPoolNS
 			Decipher() : WishNS.Algo
 			PortMaster? : number
 			PortWeb? : number
-			Pipe(Control : boolean) : Net.Socket | WishNS.Provider<Net.Socket>
+			Pipe(Control : boolean,Log? : (...Q : any[]) => any) : Net.Socket | WishNS.Provider<Net.Socket>
 			Retry? : number
 			Timeout? : number
 			Tick? : number
