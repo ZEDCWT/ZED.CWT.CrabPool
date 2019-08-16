@@ -1,6 +1,7 @@
+'use strict'
 var
 Wish = require('@zed.cwt/wish'),
-Log4JS = require('log4js'),
+HTTP = require('http'),
 Net = require('net'),
 
 SocketOption = {allowHalfOpen : true},
@@ -10,7 +11,10 @@ ActionHello = 'Hell',
 ActionWish = 'Wish',
 ActionTake = 'Take',
 ActionPool = 'Pool',
-ActionTick = 'Tick';
+ActionTick = 'Tick',
+
+ActionWebHello = 'Hell',
+ActionWebPool = 'Pool';
 
 module.exports = Option =>
 {
@@ -23,18 +27,21 @@ module.exports = Option =>
 	Retry = Option.Retry || 1E4,
 	Timeout = Wish.R.Default(3E5,Option.Timeout),
 	TickInterval = Option.Tick || 2E4,
-	OnPool = Option.OnPool,
 	PathData = Option.Data || Wish.N.JoinP(Wish.N.Data,'ZED/CrabPool'),
 	PathLog = Wish.N.JoinP(PathData,'Log'),
 	Log = Option.Log,
 	MakeLog = H => Wish.IsFunc(Log) ? (...Q) => Log(`[${H}]`,...Q) : Wish.O,
 
+	PathWeb = Wish.N.JoinP(__dirname,'Web'),
 	FileID = Wish.N.JoinP(PathData,'ID'),
+	FileKey = Wish.N.JoinP(PathData,'Key'),
 
 	MachineIDRaw,MachineID,
 	IDSolve = Q => Wish.C.HEXS(Wish.C.SHA512(Q[1])),
 	IDShort = Q => Q.slice(0,8),
-	Counter = (Q = 0) => () => Wish.R.PadS0(4,Wish.R.Radix(36,Q++).toUpperCase()),
+	Token = Wish.C.Rad(Wish.D + Wish.AZ + Wish.az).S,
+	Counter = (Q = 0) => () => Wish.R.PadS0(4,Token(Q++).toUpperCase()),
+	MakeTime = (Q = Wish.Now()) => () => Wish.StrMS(Wish.Now() - Q),
 
 	MakeSec = (Pipe,OnJSON,OnRaw) =>
 	{
@@ -96,7 +103,7 @@ module.exports = Option =>
 	{
 		T = Wish.R.ReduceU((D,V,F) => {D.push({ID : F,IP : V[PoolKeyIP]})},[],Pool)
 		Wish.R.Each(V => V[PoolKeySec].O([ActionPool,T]),Pool)
-		OnPool && OnPool(T)
+		OnPool(T)
 	},
 	PoolPartner = {},
 	MakeMEZ = () =>
@@ -106,6 +113,7 @@ module.exports = Option =>
 		Master = Net.createServer(SocketOption,S =>
 		{
 			var
+			Timer = MakeTime(),
 			Log = MakeLog(`MEZ ${Count()} ${S.remoteAddress}:${S.remotePort}`),
 			MID,SessionID = Wish.Key(32),
 			Err = Q => Sec.O([ActionError,Q]) || S.destroy(),
@@ -166,7 +174,7 @@ module.exports = Option =>
 			};
 			S.on('close',E =>
 			{
-				Log('Closed',E)
+				Log('Closed',Timer(),E)
 				Sec.E()
 				if (MID && Pool[MID] && SessionID === Pool[MID][PoolKeySID])
 				{
@@ -183,7 +191,8 @@ module.exports = Option =>
 	MakeMEZTake = (O,MID,Host,Port) =>
 	{
 		var
-		Log = MakeLog(`Take ${IDShort(MID)} ${Host}:${Port} ${O[PoolKeySID]}`),
+		Timer = MakeTime(),
+		Log = MakeLog(`Take ${IDShort(MID)} ${Host}:${Port} ${IDShort(O[PoolKeySID])}`),
 		S = Net.createConnection({host : Host,port : Port,timeout : Timeout,...SocketOption});
 
 		O[PoolKeyOnPartner](
@@ -195,7 +204,7 @@ module.exports = Option =>
 			.on('timeout',() => S.destroy())
 			.on('close',E =>
 			{
-				Log('Fin',E)
+				Log('Fin',Timer(),E)
 				O[PoolKeyPipe].destroy()
 			})
 			.on('end',() => O[PoolKeyPipe].end())
@@ -206,16 +215,17 @@ module.exports = Option =>
 
 	//	Node
 	Online,
-	MakePipeLog,
+	LogMakePipe,
 	MakePipe = (Q,S) => Wish.X.Just()
-		.FMap(() => Wish.X.IsProvider(Q = PipeMaster(Q,MakePipeLog)) ? Q : Wish.X.Just(Q))
-		.FMap(M => Wish.X.Provider(O => S(M,O))),
+		.FMap(R => Wish.X.IsProvider(R = PipeMaster(Q,LogMakePipe)) ? R : Wish.X.Just(R))
+		.FMap(M => Wish.X.Provider(O => S(M.on('error',Wish.O),O))),
 	MakeQBH = () =>
 	{
 		var Count = Counter();
 		MakePipe(true,(M,O) =>
 		{
 			var
+			Timer = MakeTime(),
 			Log = MakeLog(`QBH ${Count()}`),
 			Sec = MakeSec(M,Q =>
 			{
@@ -226,7 +236,7 @@ module.exports = Option =>
 						Online = true
 						break
 					case ActionPool :
-						OnPool && OnPool(Q[1])
+						OnPool(Q[1])
 						break
 
 					case ActionWish :
@@ -243,7 +253,7 @@ module.exports = Option =>
 			M.on('connect',() => Log('Connected'))
 				.on('close',E =>
 				{
-					Log('Closed',E)
+					Log('Closed',Timer(),E)
 					Online = false
 					Sec.E()
 					O.E()
@@ -254,6 +264,7 @@ module.exports = Option =>
 	MakeQBHTake = Q => MakePipe(false,(M,O) =>
 	{
 		var
+		Timer = MakeTime(),
 		Log = MakeLog(`Take ${IDShort(Q[2])} ${Q[3]}:${Q[4]} ${IDShort(Q[1])}`),
 		S = Net.createConnection({host : Q[3],port : Q[4],timeout : Timeout,...SocketOption}),
 		Sec = MakeSec(M,Q =>
@@ -272,7 +283,7 @@ module.exports = Option =>
 		M.on('connect',() => Log('Connected'))
 			.on('close',E =>
 			{
-				Log('Closed',E)
+				Log('Closed',Timer(),E)
 				Sec.E()
 				O.F()
 			})
@@ -281,7 +292,7 @@ module.exports = Option =>
 			.on('timeout',O.F)
 			.on('close',E =>
 			{
-				Log('Fin',E)
+				Log('Fin',Timer(),E)
 				O.F()
 			})
 			.on('end',() => M.end())
@@ -291,13 +302,17 @@ module.exports = Option =>
 	}).Now(null,Wish.O),
 
 	//	Wish
+	PoolWishKeyServer = Wish.Key(),
+	PoolWishKeyPort = Wish.Key(),
 	PoolWish = {},
 	MakeWish = (Local,Target,Host,Port) =>
 	{
-		var Count = Counter();
-		PoolWish[Local] = Net.createServer(SocketOption,S =>
+		var
+		Count = Counter(),
+		Server = Net.createServer(SocketOption,S =>
 		{
 			var
+			Timer = MakeTime(),
 			Log = MakeLog(`Wish ${Count()} ${IDShort(Target)} ${Host}:${Port}`),
 			Sec,
 			Partner,SessionID;
@@ -321,7 +336,7 @@ module.exports = Option =>
 					M.on('connect',() => Log('Connected'))
 						.on('close',E =>
 						{
-							Log('Closed',E)
+							Log('Closed',Timer(),E)
 							Sec.E()
 							O.F()
 						})
@@ -330,7 +345,7 @@ module.exports = Option =>
 						.on('timeout',O.F)
 						.on('close',E =>
 						{
-							Log('Fin',E)
+							Log('Fin',Timer(),E)
 							O.F()
 						})
 						.on('end',() => M.end())
@@ -353,7 +368,7 @@ module.exports = Option =>
 								.on('timeout',() => S.destroy())
 								.on('close',E =>
 								{
-									Log('Fin',E)
+									Log('Fin',Timer(),E)
 									Partner[PoolKeyPipe].destroy()
 								})
 								.on('end',() => Partner[PoolKeyPipe].end())
@@ -367,43 +382,109 @@ module.exports = Option =>
 			}
 			else S.destroy()
 		}).listen(Local)
-			.on('listening',() => MakeLog(`Wish ${IDShort(Target)} ${Host}:${Port}`)('Deployed'))
+			.on('listening',() =>
+			{
+				O[PoolWishKeyPort] = Server.address().port
+				MakeLog(`Wish ${IDShort(Target)} ${Host}:${Port}`)('Deployed at',O[PoolWishKeyPort])
+			}),
+		O =
+		{
+			[PoolWishKeyServer] : Server,
+			[PoolWishKeyPort] : Port
+		};
+		PoolWish[Local] = O
+	},
+
+
+
+	//	Web
+	LogWeb,
+	WebServerMap =
+	{
+		'/' : Wish.N.JoinP(PathWeb,'Entry'),
+		'/W' : require.resolve('@zed.cwt/wish'),
+		'/M' : Wish.N.JoinP(PathWeb,'Entry.js')
+	},
+	WebServer = HTTP.createServer((Q,S,R) =>
+	{
+		((R = WebServerMap[Q.url.toUpperCase().replace(/\?.*/,'')]) ? Wish.N.FileR(R,'UTF8') : Wish.X.Throw())
+			.Now(V =>
+			{
+				/\.js$/.test(R) && S.setHeader('Content-Type','application/javascript; charset=UTF-8')
+				S.end(V)
+			},() =>
+			{
+				S.writeHead(404)
+				S.end(`Unable to resolve //${Q.headers.host || ''}${Q.url}`)
+			})
+	}).on('listening',() => LogWeb('Deployed at',WebServer.address().port)),
+	LogWebSocket,
+	WebSocketPool = new Set,
+	WebSocketLast = {Pool : '["Pool",{}]'},
+	WebSocketSend = Q =>
+	{
+		WebSocketLast[Q[0]] = Q = Wish.C.OTJ(Q)
+		WebSocketPool.forEach(V => V(Q))
+	},
+	OnPool = Q => WebSocketSend(['Pool',Q]),
+	OnSocket = (S,H) =>
+	{
+		var
+		Timer = MakeTime(),
+		Addr = H.connection.remoteAddress + ':' + H.connection.remotePort,
+		Send = D =>
+		{
+
+			try{S.send(Wish.C.B91S(D))}catch(_){}
+		},
+		Suicide = () => S.terminate();
+		LogWebSocket('Accepted',Addr)
+		S.on('message',Q =>
+		{
+			Q = Wish.C.B91P(Q.data)
+
+			Q = Wish.C.JTOO(Wish.C.U16S(Q))
+			if (!Wish.IsArr(Q)) return Suicide()
+			switch (Q[0])
+			{
+				case ActionWebHello :
+				case ActionWebPool :
+				default : Suicide()
+			}
+		}).on('close',E =>
+		{
+			LogWebSocket('Closed',Timer(),E,Addr)
+			WebSocketPool.delete(Send)
+		})
+
+		Wish.R.Each(Send,WebSocketLast)
 	};
 
-	if (null == Log)
-	{
-		Log = Log4JS.configure(
-		{
-			appenders : {O :
-			{
-				type : 'dateFile',
-				filename : Wish.N.JoinP(PathLog,'Event.log'),
-				pattern : '.yyyy.MM.dd',
-				keepFileExt : true,
-				layout :
-				{
-					type : 'pattern',
-					pattern : '%x{O} | %m',
-					tokens : {O : () => Wish.StrDate() + ' | ' + Wish.Tick()}
-				}
-			}},
-			categories :
-			{
-				default : {appenders : ['O'],level : 'all'}
-			}
-		}).getLogger('O')
-		Log = Log.debug.bind(Log)
-	}
-	MakePipeLog = MakeLog('Pipe')
+	if (null == Log) Log = (H => (...Q) => H(Wish.StrDate(),Wish.Tick(),'|',...Q))
+		(Wish.N.RollLog({Pre : Wish.N.JoinP(PathLog,'Event')}))
+	LogMakePipe = MakeLog('Pipe')
+	LogWeb = MakeLog('Web')
+	LogWebSocket = MakeLog('WebSocket')
 
-	return Wish.N.MakeDir(PathLog)
-		.FMap(() => Wish.N.FileR(FileID))
-		.ErrAs(() => Wish.N.FileW(FileID,Wish.Key(320))
-			.FMap(() => Wish.N.FileR(FileID)))
-		.Map(Q =>
-		{
-			MachineID = IDSolve(MachineIDRaw = Wish.C.HEXS(Wish.C.SHA512(Q)))
-			Log(MachineID)
-			PipeMaster ? MakeQBH() : MakeMEZ()
-		})
+	Wish.IsNum(PortWeb) && new (require('ws')).Server({server : WebServer.listen(PortWeb)}).on('connection',OnSocket)
+
+	return {
+		Log,
+		Pool : Wish.N.MakeDir(PathLog)
+			.FMap(() => Wish.N.FileR(FileID))
+			.ErrAs(() => Wish.N.FileW(FileID,Wish.Key(320))
+				.FMap(() => Wish.N.FileR(FileID)))
+			.Map(Q =>
+			{
+				MachineID = IDSolve(MachineIDRaw = Wish.C.HEXS(Wish.C.SHA512(Q)))
+				Log(MachineID)
+				PipeMaster ? MakeQBH() : MakeMEZ()
+			})
+			.FMap(() => Wish.N.FileR(FileKey))
+			.Now(),
+		Exp : X => (X || require('express').Router())
+			.use((Q,S,N) => '/' === Q.path && !/\/(\?.*)?$/.test(Q.originalUrl) ? S.redirect(302,Q.baseUrl + Q.url) : N())
+			.use((Q,S,N) => (Q = WebServerMap[Q.path.toUpperCase()]) ? S.sendFile(Q) : N()),
+		Soc : OnSocket
+	}
 }

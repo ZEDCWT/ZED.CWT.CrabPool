@@ -12,11 +12,10 @@
 	"license" : "MIT",
 	"dependencies" :
 	{
-		"@zed.cwt/wish" : ">=0.0.2",
-		"log4js" : "^4.5.1"
+		"@zed.cwt/wish" : ">=0.0.2"
 	},
 	"devDependencies" :
 	{
-		"request" : "^2.88.0"
+		"ws" : ">=7.1.2"
 	}
 }
