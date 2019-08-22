@@ -1,6 +1,7 @@
 'use strict'
 var
-Wish = require('@zed.cwt/wish'),
+WW = require('@zed.cwt/wish'),
+{R : WR,X : WX,C : WC,N : WN} = WW,
 HTTP = require('http'),
 Net = require('net'),
 
@@ -14,6 +15,7 @@ ActionPool = 'Pool',
 ActionTick = 'Tick',
 
 ActionWebHello = 'Hell',
+ActionWebMEZ = 'MEZ',
 ActionWebPool = 'Pool';
 
 module.exports = Option =>
@@ -25,23 +27,26 @@ module.exports = Option =>
 	PortWeb = Option.PortWeb,
 	PipeMaster = Option.Pipe,
 	Retry = Option.Retry || 1E4,
-	Timeout = Wish.R.Default(3E5,Option.Timeout),
+	Timeout = WR.Default(3E5,Option.Timeout),
 	TickInterval = Option.Tick || 2E4,
-	PathData = Option.Data || Wish.N.JoinP(Wish.N.Data,'ZED/CrabPool'),
-	PathLog = Wish.N.JoinP(PathData,'Log'),
+	PathData = Option.Data || WN.JoinP(WN.Data,'ZED/CrabPool'),
+	PathLog = WN.JoinP(PathData,'Log'),
 	Log = Option.Log,
-	MakeLog = H => Wish.IsFunc(Log) ? (...Q) => Log(`[${H}]`,...Q) : Wish.O,
+	MakeLog = H => WW.IsFunc(Log) ? (...Q) => Log(`[${H}]`,...Q) : WW.O,
 
-	PathWeb = Wish.N.JoinP(__dirname,'Web'),
-	FileID = Wish.N.JoinP(PathData,'ID'),
-	FileKey = Wish.N.JoinP(PathData,'Key'),
+	PathWeb = WN.JoinP(__dirname,'Web'),
+	FileID = WN.JoinP(PathData,'ID'),
+	FileKey = WN.JoinP(PathData,'Key'),
 
 	MachineIDRaw,MachineID,
-	IDSolve = Q => Wish.C.HEXS(Wish.C.SHA512(Q[1])),
+	IDSolve = Q => WC.HEXS(WC.SHA512(Q[1])),
 	IDShort = Q => Q.slice(0,8),
-	Token = Wish.C.Rad(Wish.D + Wish.AZ + Wish.az).S,
-	Counter = (Q = 0) => () => Wish.R.PadS0(4,Token(Q++).toUpperCase()),
-	MakeTime = (Q = Wish.Now()) => () => Wish.StrMS(Wish.Now() - Q),
+	Token = WC.Rad(WW.D + WW.AZ + WW.az).S,
+	Counter = (Q = 0) => () => WR.PadS0(4,Token(Q++).toUpperCase()),
+	MakeTime = (Q = WW.Now()) => () => WW.StrMS(WW.Now() - Q),
+	WebKey,
+	KeyStepA = Q => WC.HSHA512(Q,MachineID),
+	KeyStepB = Q => WC.HSHA512(MachineID,Q),
 
 	MakeSec = (Pipe,OnJSON,OnRaw) =>
 	{
@@ -67,7 +72,7 @@ module.exports = Option =>
 		{
 			for (;
 				T = yield* Take(2),
-				T = OnJSON(Wish.C.JTOO((yield* Take(256 * T[1] + T[0])).toString('UTF8'))),
+				T = OnJSON(WC.JTOO((yield* Take(256 * T[1] + T[0])).toString('UTF8'))),
 				undefined === T
 			;);
 			clearInterval(Tick)
@@ -77,14 +82,14 @@ module.exports = Option =>
 		W = Q => Pipe.destroyed || Pipe.write(Q),
 		O = Q =>
 		{
-			Q = Wish.IsBuff(Q) ? Q : Buffer.from(Wish.IsObj(Q) ? Wish.C.OTJ(Q) : Q,'UTF8')
+			Q = WW.IsBuff(Q) ? Q : Buffer.from(WW.IsObj(Q) ? WC.OTJ(Q) : Q,'UTF8')
 			W(Buffer.from(C.D([255 & Q.length,255 & Q.length >>> 8]).concat(C.D(Q))))
 		},
 		Tick = setInterval(() => Pipe.destroyed || O([ActionTick]),TickInterval);
 
 		Now.next()
 		Pipe.on('data',Q => Done ? OnRaw(Done[0] ? Q : Buffer.from(D.D(Q))) : Now.next(Buffer.from(D.D(Q))))
-			.on('error',Wish.O)
+			.on('error',WW.O)
 		return {
 			D : Q => W(Buffer.from(C.D(Q))),
 			O : O,
@@ -93,16 +98,16 @@ module.exports = Option =>
 	},
 
 	//	Master
-	PoolKeySID = Wish.Key(),
-	PoolKeyIP = Wish.Key(),
-	PoolKeyPipe = Wish.Key(),
-	PoolKeySec = Wish.Key(),
-	PoolKeyOnPartner = Wish.Key(),
+	PoolKeySID = WW.Key(),
+	PoolKeyIP = WW.Key(),
+	PoolKeyPipe = WW.Key(),
+	PoolKeySec = WW.Key(),
+	PoolKeyOnPartner = WW.Key(),
 	Pool = {},
 	PoolNotify = T =>
 	{
-		T = Wish.R.ReduceU((D,V,F) => {D.push({ID : F,IP : V[PoolKeyIP]})},[],Pool)
-		Wish.R.Each(V => V[PoolKeySec].O([ActionPool,T]),Pool)
+		T = WR.ReduceU((D,V,F) => {D.push({ID : F,IP : V[PoolKeyIP]})},[],Pool)
+		WR.Each(V => V[PoolKeySec].O([ActionPool,T]),Pool)
 		OnPool(T)
 	},
 	PoolPartner = {},
@@ -115,7 +120,7 @@ module.exports = Option =>
 			var
 			Timer = MakeTime(),
 			Log = MakeLog(`MEZ ${Count()} ${S.remoteAddress}:${S.remotePort}`),
-			MID,SessionID = Wish.Key(32),
+			MID,SessionID = WW.Key(32),
 			Err = Q => Sec.O([ActionError,Q]) || S.destroy(),
 			Partner,
 			Sec = MakeSec(S,Q =>
@@ -126,31 +131,31 @@ module.exports = Option =>
 						if (!Q[1]) return Err('Who are you')
 						MID = IDSolve(Q[1])
 						if (MID === MachineID) return Err('You are not only')
-						Wish.R.Has(MID,Pool) &&
+						WR.Has(MID,Pool) &&
 						(
 							Pool[MID][PoolKeySec].O([ActionError,'You are not only']),
 							Pool[MID][PoolKeyPipe].destroy()
 						)
 						Pool[MID] = O
-						Sec.O([ActionHello])
+						Sec.O([ActionHello,MachineID])
 						PoolNotify()
 						Log('Node')
 						break
 
 					case ActionWish :
-						if (!Wish.R.Has(MID = IDSolve(Q[1]),Pool)) return Err('Who are you')
+						if (!WR.Has(MID = IDSolve(Q[1]),Pool)) return Err('Who are you')
 						if (Q[2] === MachineID) MakeMEZTake(O,MID,Q[3],Q[4])
 						else
 						{
-							if (!Wish.R.Has(Q[2],Pool)) return Err('Who is that')
+							if (!WR.Has(Q[2],Pool)) return Err('Who is that')
 							PoolPartner[SessionID] = O
 							Pool[Q[2]][PoolKeySec].O([ActionWish,SessionID,MID,Q[3],Q[4]])
 						}
 						Log('Wish')
 						return false
 					case ActionTake :
-						if (!Wish.R.Has(MID = IDSolve(Q[1]),Pool)) return Err('Who are you')
-						if (!Wish.R.Has(Q[2],PoolPartner)) return Err('Who is that')
+						if (!WR.Has(MID = IDSolve(Q[1]),Pool)) return Err('Who are you')
+						if (!WR.Has(Q[2],PoolPartner)) return Err('Who is that')
 						Partner = PoolPartner[Q[2]]
 						Partner[PoolKeyOnPartner](O)
 						Sec.O([ActionWish])
@@ -178,11 +183,11 @@ module.exports = Option =>
 				Sec.E()
 				if (MID && Pool[MID] && SessionID === Pool[MID][PoolKeySID])
 				{
-					Wish.R.Del(MID,Pool)
+					WR.Del(MID,Pool)
 					PoolNotify()
 				}
 				Partner && Partner[PoolKeyPipe].destroy()
-				Wish.R.Del(SessionID,PoolPartner)
+				WR.Del(SessionID,PoolPartner)
 			}).on('end',() => Partner && Partner[PoolKeyPipe].end())
 			Log('Connected')
 		}).listen(PortMaster || 0)
@@ -200,7 +205,7 @@ module.exports = Option =>
 			[PoolKeyPipe] : S,
 			[PoolKeySec] : {D : Q => S.write(Q)}
 		})
-		S.on('error',Wish.O)
+		S.on('error',WW.O)
 			.on('timeout',() => S.destroy())
 			.on('close',E =>
 			{
@@ -216,9 +221,9 @@ module.exports = Option =>
 	//	Node
 	Online,
 	LogMakePipe,
-	MakePipe = (Q,S) => Wish.X.Just()
-		.FMap(R => Wish.X.IsProvider(R = PipeMaster(Q,LogMakePipe)) ? R : Wish.X.Just(R))
-		.FMap(M => Wish.X.Provider(O => S(M.on('error',Wish.O),O))),
+	MakePipe = (Q,S) => WX.Just()
+		.FMap(R => WX.IsProvider(R = PipeMaster(Q,LogMakePipe)) ? R : WX.Just(R))
+		.FMap(M => WX.Provider(O => S(M.on('error',WW.O),O))),
 	MakeQBH = () =>
 	{
 		var Count = Counter();
@@ -233,6 +238,7 @@ module.exports = Option =>
 				{
 					case ActionHello :
 						Log('Online')
+						WebSocketSend([ActionWebMEZ,Q[1]])
 						Online = true
 						break
 					case ActionPool :
@@ -255,6 +261,7 @@ module.exports = Option =>
 				{
 					Log('Closed',Timer(),E)
 					Online = false
+					WebSocketSend([ActionWebMEZ,null])
 					Sec.E()
 					O.E()
 				})
@@ -288,7 +295,7 @@ module.exports = Option =>
 				O.F()
 			})
 			.on('end',() => S.end())
-		S.on('error',Wish.O)
+		S.on('error',WW.O)
 			.on('timeout',O.F)
 			.on('close',E =>
 			{
@@ -299,11 +306,11 @@ module.exports = Option =>
 		Sec.O([ActionTake,MachineIDRaw,Q[1]])
 		Sec.E()
 		return () => M.destroy() | S.destroy()
-	}).Now(null,Wish.O),
+	}).Now(null,WW.O),
 
 	//	Wish
-	PoolWishKeyServer = Wish.Key(),
-	PoolWishKeyPort = Wish.Key(),
+	PoolWishKeyServer = WW.Key(),
+	PoolWishKeyPort = WW.Key(),
 	PoolWish = {},
 	MakeWish = (Local,Target,Host,Port) =>
 	{
@@ -316,7 +323,7 @@ module.exports = Option =>
 			Log = MakeLog(`Wish ${Count()} ${IDShort(Target)} ${Host}:${Port}`),
 			Sec,
 			Partner,SessionID;
-			S.on('error',Wish.O)
+			S.on('error',WW.O)
 			if (PipeMaster) Online ?
 				MakePipe(false,(M,O) =>
 				{
@@ -352,11 +359,11 @@ module.exports = Option =>
 					Sec.O([ActionWish,MachineIDRaw,Target,Host,Port])
 					Sec.E()
 					return () => M.destroy() | S.destroy()
-				}).Now(null,Wish.O,() => S.destroy()) :
+				}).Now(null,WW.O,() => S.destroy()) :
 				S.destroy()
-			else if (Wish.R.Has(Target,Pool))
+			else if (WR.Has(Target,Pool))
 			{
-				PoolPartner[SessionID = Wish.Key(32)] =
+				PoolPartner[SessionID = WW.Key(32)] =
 				{
 					[PoolKeyPipe] : S,
 					[PoolKeySec] :
@@ -401,13 +408,13 @@ module.exports = Option =>
 	LogWeb,
 	WebServerMap =
 	{
-		'/' : Wish.N.JoinP(PathWeb,'Entry'),
+		'/' : WN.JoinP(PathWeb,'Entry'),
 		'/W' : require.resolve('@zed.cwt/wish'),
-		'/M' : Wish.N.JoinP(PathWeb,'Entry.js')
+		'/M' : WN.JoinP(PathWeb,'Entry.js')
 	},
 	WebServer = HTTP.createServer((Q,S,R) =>
 	{
-		((R = WebServerMap[Q.url.toUpperCase().replace(/\?.*/,'')]) ? Wish.N.FileR(R,'UTF8') : Wish.X.Throw())
+		((R = WebServerMap[Q.url.toUpperCase().replace(/\?.*/,'')]) ? WN.FileR(R,'UTF8') : WX.Throw())
 			.Now(V =>
 			{
 				/\.js$/.test(R) && S.setHeader('Content-Type','application/javascript; charset=UTF-8')
@@ -420,35 +427,34 @@ module.exports = Option =>
 	}).on('listening',() => LogWeb('Deployed at',WebServer.address().port)),
 	LogWebSocket,
 	WebSocketPool = new Set,
-	WebSocketLast = {Pool : '["Pool",{}]'},
+	WebSocketLast = {[ActionWebPool] : `["${ActionWebPool}",[]]`},
 	WebSocketSend = Q =>
 	{
-		WebSocketLast[Q[0]] = Q = Wish.C.OTJ(Q)
+		WebSocketLast[Q[0]] = Q = WC.OTJ(Q)
 		WebSocketPool.forEach(V => V(Q))
 	},
-	OnPool = Q => WebSocketSend(['Pool',Q]),
+	OnPool = Q => WebSocketSend([ActionWebPool,Q]),
 	OnSocket = (S,H) =>
 	{
 		var
 		Timer = MakeTime(),
 		Addr = H.connection.remoteAddress + ':' + H.connection.remotePort,
+		Cipher = WC.AESES(WebKey,WebKey,WC.CFB),
+		Decipher = WC.AESDS(WebKey,WebKey,WC.CFB),
 		Send = D =>
 		{
-
-			try{S.send(Wish.C.B91S(D))}catch(_){}
+			D = Cipher.D(D)
+			try{S.send(WC.B91S(D))}catch(_){}
 		},
 		Suicide = () => S.terminate();
 		LogWebSocket('Accepted',Addr)
 		S.on('message',Q =>
 		{
-			Q = Wish.C.B91P(Q.data)
-
-			Q = Wish.C.JTOO(Wish.C.U16S(Q))
-			if (!Wish.IsArr(Q)) return Suicide()
+			Q = Decipher.D(WC.B91P(Q))
+			Q = WC.JTOO(WC.U16S(Q))
+			if (!WW.IsArr(Q)) return Suicide()
 			switch (Q[0])
 			{
-				case ActionWebHello :
-				case ActionWebPool :
 				default : Suicide()
 			}
 		}).on('close',E =>
@@ -456,31 +462,41 @@ module.exports = Option =>
 			LogWebSocket('Closed',Timer(),E,Addr)
 			WebSocketPool.delete(Send)
 		})
-
-		Wish.R.Each(Send,WebSocketLast)
+		try{S.send(MachineID)}catch(_){}
+		Send(WC.OTJ([ActionWebHello,MachineID,!PipeMaster]))
+		WR.Each(Send,WebSocketLast)
+		WebSocketPool.add(Send)
 	};
 
-	if (null == Log) Log = (H => (...Q) => H(Wish.StrDate(),Wish.Tick(),'|',...Q))
-		(Wish.N.RollLog({Pre : Wish.N.JoinP(PathLog,'Event')}))
+	if (null == Log) Log = (H => (...Q) => H(WW.StrDate(),WW.Tick(),'|',...Q))
+		(WN.RollLog({Pre : WN.JoinP(PathLog,'Event')}))
 	LogMakePipe = MakeLog('Pipe')
 	LogWeb = MakeLog('Web')
 	LogWebSocket = MakeLog('WebSocket')
 
-	Wish.IsNum(PortWeb) && new (require('ws')).Server({server : WebServer.listen(PortWeb)}).on('connection',OnSocket)
+	WW.IsNum(PortWeb) && new (require('ws')).Server({server : WebServer.listen(PortWeb)}).on('connection',OnSocket)
 
 	return {
 		Log,
-		Pool : Wish.N.MakeDir(PathLog)
-			.FMap(() => Wish.N.FileR(FileID))
-			.ErrAs(() => Wish.N.FileW(FileID,Wish.Key(320))
-				.FMap(() => Wish.N.FileR(FileID)))
+		Pool : WN.MakeDir(PathLog)
+			.FMap(() => WN.FileR(FileID)
+				.ErrAs(() => WN.FileW(FileID,WW.Key(320))
+					.FMap(() => WN.FileR(FileID))))
 			.Map(Q =>
 			{
-				MachineID = IDSolve(MachineIDRaw = Wish.C.HEXS(Wish.C.SHA512(Q)))
+				MachineID = IDSolve(MachineIDRaw = WC.HEXS(WC.SHA512(Q)))
 				Log(MachineID)
 				PipeMaster ? MakeQBH() : MakeMEZ()
 			})
-			.FMap(() => Wish.N.FileR(FileKey))
+			.FMap(() => WN.FileR(FileKey)
+				.ErrAs(K =>
+				(
+					K = WW.Key(20),
+					Log('Key',K),
+					WN.FileW(FileKey,WC.B91S(KeyStepB(KeyStepA(K))))
+						.FMap(() => WC.FileR(FileKey))
+				)))
+			.Map(Q => {WebKey = WC.B91P(Q)})
 			.Now(),
 		Exp : X => (X || require('express').Router())
 			.use((Q,S,N) => '/' === Q.path && !/\/(\?.*)?$/.test(Q.originalUrl) ? S.redirect(302,Q.baseUrl + Q.url) : N())
