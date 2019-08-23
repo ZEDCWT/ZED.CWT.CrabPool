@@ -39,6 +39,9 @@ module.exports = Option =>
 	FileID = WN.JoinP(PathData,'ID'),
 	FileToken = WN.JoinP(PathData,'Key'),
 
+	DataPool = WN.JSON(WN.JoinP(PathData,'Pool')),
+	DataLink = WN.JSON(WN.JoinP(PathData,'Link')),
+
 	MachineIDRaw,MachineID,
 	IDSolve = Q => WC.HEXS(WC.SHA512(Q[1])),
 	IDShort = Q => Q.slice(0,8),
@@ -100,14 +103,13 @@ module.exports = Option =>
 
 	//	Master
 	PoolKeySID = WW.Key(),
-	PoolKeyIP = WW.Key(),
 	PoolKeyPipe = WW.Key(),
 	PoolKeySec = WW.Key(),
 	PoolKeyOnPartner = WW.Key(),
 	Pool = {},
 	PoolNotify = T =>
 	{
-		T = WR.ReduceU((D,V,F) => {D.push({ID : F,IP : V[PoolKeyIP]})},[],Pool)
+		T = DataPool.O()
 		WR.Each(V => V[PoolKeySec].O([ActionPool,T]),Pool)
 		OnPool(T)
 	},
@@ -120,10 +122,12 @@ module.exports = Option =>
 		{
 			var
 			Timer = MakeTime(),
-			Log = MakeLog(`MEZ ${Count()} ${S.remoteAddress}:${S.remotePort}`),
+			IP = `${S.remoteAddress}:${S.remotePort}`,
+			Log = MakeLog(`MEZ ${Count()} ${IP}`),
 			MID,SessionID = WW.Key(32),
 			Err = Q => Sec.O([ActionError,Q]) || S.destroy(),
 			Partner,
+			Record,
 			Sec = MakeSec(S,Q =>
 			{
 				switch (Q[0])
@@ -138,6 +142,16 @@ module.exports = Option =>
 							Pool[MID][PoolKeyPipe].destroy()
 						)
 						Pool[MID] = O
+						Record = DataPool.D(MID)
+						if (!Record)
+						{
+							Record = DataPool.D(MID,{})
+							Record.Boom = WW.Now()
+						}
+						Record.S = 9
+						Record.IP = IP
+						Record.From = WW.Now()
+						DataPool.S()
 						Sec.O([ActionHello,MachineID])
 						PoolNotify()
 						Log('Node')
@@ -173,7 +187,6 @@ module.exports = Option =>
 			O =
 			{
 				[PoolKeySID] : SessionID,
-				[PoolKeyIP] : `${S.remoteAddress}:${S.remotePort}`,
 				[PoolKeyPipe] : S,
 				[PoolKeySec] : Sec,
 				[PoolKeyOnPartner] : Q => Partner = Q
@@ -184,7 +197,10 @@ module.exports = Option =>
 				Sec.E()
 				if (MID && Pool[MID] && SessionID === Pool[MID][PoolKeySID])
 				{
+					Record.S = 0
+					Record.To = WW.Now()
 					WR.Del(MID,Pool)
+					DataPool.S()
 					PoolNotify()
 				}
 				Partner && Partner[PoolKeyPipe].destroy()
@@ -221,9 +237,9 @@ module.exports = Option =>
 
 	//	Node
 	Online,
-	LogMakePipe,
+	MakePipeCount = Counter(),
 	MakePipe = (Q,S) => WX.Just()
-		.FMap(R => WX.IsProvider(R = PipeMaster(Q,LogMakePipe)) ? R : WX.Just(R))
+		.FMap(R => WX.IsProvider(R = PipeMaster(Q,MakeLog(`Pipe ${MakePipeCount()}`))) ? R : WX.Just(R))
 		.FMap(M => WX.Provider(O => S(M.on('error',WW.O),O))),
 	MakeQBH = () =>
 	{
@@ -243,7 +259,7 @@ module.exports = Option =>
 						Online = true
 						break
 					case ActionPool :
-						OnPool(Q[1])
+						OnPool(DataPool.O(Q[1]))
 						break
 
 					case ActionWish :
@@ -428,7 +444,7 @@ module.exports = Option =>
 	}).on('listening',() => LogWeb('Deployed at',WebServer.address().port)),
 	LogWebSocket,
 	WebSocketPool = new Set,
-	WebSocketLast = {[ActionWebPool] : `["${ActionWebPool}",[]]`},
+	WebSocketLast = {[ActionWebPool] : [ActionWebPool,DataPool.O()]},
 	WebSocketSend = Q =>
 	{
 		WebSocketLast[Q[0]] = Q
@@ -494,11 +510,8 @@ module.exports = Option =>
 
 	if (null == Log) Log = (H => (...Q) => H(WW.StrDate(),WW.Tick(),'|',...Q))
 		(WN.RollLog({Pre : WN.JoinP(PathLog,'Event')}))
-	LogMakePipe = MakeLog('Pipe')
 	LogWeb = MakeLog('Web')
 	LogWebSocket = MakeLog('WebSocket')
-
-	WW.IsNum(PortWeb) && new (require('ws')).Server({server : WebServer.listen(PortWeb)}).on('connection',OnSocket)
 
 	return {
 		Log,
@@ -506,12 +519,7 @@ module.exports = Option =>
 			.FMap(() => WN.FileR(FileID)
 				.ErrAs(() => WN.FileW(FileID,WW.Key(320))
 					.FMap(() => WN.FileR(FileID))))
-			.Map(Q =>
-			{
-				MachineID = IDSolve(MachineIDRaw = WC.HEXS(WC.SHA512(Q)))
-				Log(MachineID)
-				PipeMaster ? MakeQBH() : MakeMEZ()
-			})
+			.Map(Q => MachineID = IDSolve(MachineIDRaw = WC.HEXS(WC.SHA512(Q))))
 			.FMap(() => WN.FileR(FileToken)
 				.ErrAs(K =>
 				(
@@ -520,8 +528,13 @@ module.exports = Option =>
 					WN.FileW(FileToken,WC.B91S(TokenStepB(TokenStepA(K))))
 						.FMap(() => WN.FileR(FileToken))
 				)))
-			.Map(Q => {WebToken = WC.B91P(Q)})
-			.Now(),
+			.Map(Q => WebToken = WC.B91P(Q))
+			.Now(() =>
+			{
+				PipeMaster ? MakeQBH() : MakeMEZ()
+				Log('========')
+				WW.IsNum(PortWeb) && new (require('ws')).Server({server : WebServer.listen(PortWeb)}).on('connection',OnSocket)
+			}),
 		Exp : X => (X || require('express').Router())
 			.use((Q,S,N) => '/' === Q.path && !/\/(\?.*)?$/.test(Q.originalUrl) ? S.redirect(302,Q.baseUrl + Q.url) : N())
 			.use((Q,S,N) => (Q = WebServerMap[Q.path.toUpperCase()]) ? S.sendFile(Q) : N()),

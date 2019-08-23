@@ -20,7 +20,8 @@
 	NotiNewToken = Noti.O(),
 
 	Online,Connecting,
-	WebSocketSend = WW.O,
+	WebSocketNotConnected = function(){Noti.S('Unable to perform when offline')},
+	WebSocketSend = WebSocketNotConnected,
 	MachineID,
 	TokenStepA = function(Q){return WC.HSHA512(Q,MachineID)},
 	TokenStepB = function(Q){return WC.HSHA512(MachineID,Q)},
@@ -46,6 +47,7 @@
 					{
 						Q = Cipher.D(WC.OTJ([WW.Key(WW.Rnd(20,40)),Q,WW.Key(WW.Rnd(20,40))]))
 						Client.send(WC.B91S(Q))
+						return true
 					}
 				}
 				WebSocketSend([ActionWebHello,Wish.C.B91S(Key)])
@@ -63,11 +65,14 @@
 					Online = Shaked = true
 					NotiOnline('Connected')
 					NotiOnline(false)
+					OnConnect(Q[1],Q[2])
 					break
 				case ActionWebMEZ :
+					OnMEZ(Q[1])
 					break
 
 				case ActionWebPool :
+					OnPool(Q[1])
 					break
 
 				case ActionWebToken :
@@ -85,11 +90,16 @@
 		Client.onclose = function()
 		{
 			Online = Connecting = false
-			NotiOnline(['Closed.',Shaked ? '' : ' Failed to handshake, the token may not be correct'])
+			WebSocketSend = WebSocketNotConnected
+			NotiOnline(['Offline.',Shaked ? '' : ' Failed to handshake, the token may not be correct'])
 		}
 		NotiOnline('Connecting...')
 		Connecting = true
 	},
+
+	OnConnect,
+	OnMEZ,
+	OnPool,
 
 	Rainbow = WV.Div(2,['10%'],true),
 	RTab = WV.Split({Pan : Rainbow});
@@ -107,7 +117,7 @@
 		['Auth',function(V)
 		{
 			var
-			R = WV.Rock(WV.Ini + ' ' + WV.S6),
+			R = WV.Rock(WV.S6),
 			Connect = function()
 			{
 				if (Connecting) Noti.S('Already ' + (Online ? 'connected' : 'connecting'))
@@ -125,17 +135,11 @@
 			}),
 			SaveNew = function()
 			{
-				if (Online)
+				if (WebSocketSend([ActionWebToken,WC.B91S(TokenStepA(Token.V())),WC.B91S(TokenStepA(TokenNew.V()))]))
 				{
-					WebSocketSend([ActionWebToken,WC.B91S(TokenStepA(Token.V())),WC.B91S(TokenStepA(TokenNew.V()))])
 					Token.V('')
 					TokenNew.V('')
 					NotiNewToken('Saving new token')
-				}
-				else
-				{
-					NotiNewToken('Unable to save new token, not connected')
-					NotiNewToken(false)
 				}
 			},
 			TokenNew = WV.Inp(
@@ -163,15 +167,15 @@
 					C : SaveNew
 				})
 			],R)
-			WV.ApA([WV.Rock(WV.VertM),R],V)
+			WV.Ap(R,V)
 			return {
 				CSS : function(ID)
 				{
 					return WW.Fmt
 					(
-						'#`R`{text-align:center}' +
-						'#`R`>div{margin:40px;padding:20px}' +
-						'#`R` .`I`{margin:20px 0;width:20em}',
+						'#`R`{padding:40px;text-align:center}' +
+						'#`R`>div{margin:auto;padding:20px;max-width:26em}' +
+						'#`R` .`I`{margin:20px 0}',
 						{
 							R : ID,
 							I : WV.InpW
@@ -183,7 +187,63 @@
 		}],
 		['Pool',function(V)
 		{
+			var
+			ClassCard = WW.Key(),
+			MakeCard = function()
+			{
+				var
+				U = WV.Rock(ClassCard + ' ' + WV.S4),
+				R =
+				{
+					R : U,
+					I : function(Q)
+					{
 
+					},
+					O : function(/**@type {{S : number,IP : string,Boom : number,From : number,To : number}}*/Q)
+					{
+
+					},
+					C : function(Q)
+					{
+
+					}
+				};
+				return R
+			},
+			CardMEZ = MakeCard(
+			{
+
+			}),
+			CardQBH = [],
+			CardCurrent;
+			OnConnect = function()
+			{
+
+			}
+			OnMEZ = function()
+			{
+
+			}
+			OnPool = function(Q)
+			{
+
+			}
+			WV.ApR([CardMEZ,WV.HR()],V)
+			return {
+				CSS : function(ID)
+				{
+					return WW.Fmt
+					(
+						'#`R`>*{margin:20px}' +
+						'.`C`{padding:20px}',
+						{
+							R : ID,
+							C : ClassCard
+						}
+					)
+				}
+			}
 		}],
 		['Link',function(V)
 		{
