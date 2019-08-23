@@ -16,7 +16,8 @@ ActionTick = 'Tick',
 
 ActionWebHello = 'Hell',
 ActionWebMEZ = 'MEZ',
-ActionWebPool = 'Pool';
+ActionWebPool = 'Pool',
+ActionWebToken = 'Toke';
 
 module.exports = Option =>
 {
@@ -36,7 +37,7 @@ module.exports = Option =>
 
 	PathWeb = WN.JoinP(__dirname,'Web'),
 	FileID = WN.JoinP(PathData,'ID'),
-	FileKey = WN.JoinP(PathData,'Key'),
+	FileToken = WN.JoinP(PathData,'Key'),
 
 	MachineIDRaw,MachineID,
 	IDSolve = Q => WC.HEXS(WC.SHA512(Q[1])),
@@ -44,9 +45,9 @@ module.exports = Option =>
 	Token = WC.Rad(WW.D + WW.AZ + WW.az).S,
 	Counter = (Q = 0) => () => WR.PadS0(4,Token(Q++).toUpperCase()),
 	MakeTime = (Q = WW.Now()) => () => WW.StrMS(WW.Now() - Q),
-	WebKey,
-	KeyStepA = Q => WC.HSHA512(Q,MachineID),
-	KeyStepB = Q => WC.HSHA512(MachineID,Q),
+	WebToken,
+	TokenStepA = Q => WC.HSHA512(Q,MachineID),
+	TokenStepB = Q => WC.HSHA512(MachineID,Q),
 
 	MakeSec = (Pipe,OnJSON,OnRaw) =>
 	{
@@ -72,7 +73,7 @@ module.exports = Option =>
 		{
 			for (;
 				T = yield* Take(2),
-				T = OnJSON(WC.JTOO((yield* Take(256 * T[1] + T[0])).toString('UTF8'))),
+				T = OnJSON(WC.JTOO((yield* Take(256 * T[1] + T[0])).toString('UTF8'))[1] || []),
 				undefined === T
 			;);
 			clearInterval(Tick)
@@ -82,7 +83,7 @@ module.exports = Option =>
 		W = Q => Pipe.destroyed || Pipe.write(Q),
 		O = Q =>
 		{
-			Q = WW.IsBuff(Q) ? Q : Buffer.from(WW.IsObj(Q) ? WC.OTJ(Q) : Q,'UTF8')
+			Q = Buffer.from(WC.OTJ([WW.Key(WW.Rnd(20,40)),Q,WW.Key(WW.Rnd(20,40))]),'UTF8')
 			W(Buffer.from(C.D([255 & Q.length,255 & Q.length >>> 8]).concat(C.D(Q))))
 		},
 		Tick = setInterval(() => Pipe.destroyed || O([ActionTick]),TickInterval);
@@ -430,7 +431,7 @@ module.exports = Option =>
 	WebSocketLast = {[ActionWebPool] : `["${ActionWebPool}",[]]`},
 	WebSocketSend = Q =>
 	{
-		WebSocketLast[Q[0]] = Q = WC.OTJ(Q)
+		WebSocketLast[Q[0]] = Q
 		WebSocketPool.forEach(V => V(Q))
 	},
 	OnPool = Q => WebSocketSend([ActionWebPool,Q]),
@@ -439,33 +440,56 @@ module.exports = Option =>
 		var
 		Timer = MakeTime(),
 		Addr = H.connection.remoteAddress + ':' + H.connection.remotePort,
-		Cipher = WC.AESES(WebKey,WebKey,WC.CFB),
-		Decipher = WC.AESDS(WebKey,WebKey,WC.CFB),
+		Cipher = WC.AESES(WebToken,WebToken,WC.CFB),
+		Decipher = WC.AESDS(WebToken,WebToken,WC.CFB),
 		Send = D =>
 		{
-			D = Cipher.D(D)
+			D = Cipher.D(WC.OTJ([WW.Key(WW.Rnd(20,40)),D,WW.Key(WW.Rnd(20,40))]))
 			try{S.send(WC.B91S(D))}catch(_){}
 		},
-		Suicide = () => S.terminate();
+		Suicide = () => S.terminate(),
+		Wait = WW.To(Timeout,Suicide);
+
 		LogWebSocket('Accepted',Addr)
 		S.on('message',Q =>
 		{
+			Wait.D()
 			Q = Decipher.D(WC.B91P(Q))
 			Q = WC.JTOO(WC.U16S(Q))
 			if (!WW.IsArr(Q)) return Suicide()
+			Q = Q[1]
+			if (!WW.IsArr(Q)) return Suicide()
 			switch (Q[0])
 			{
+				case ActionWebHello :
+					if (WC.HEXS(TokenStepB(WC.B91P(Q[1]))) !== WC.HEXS(WebToken)) return Suicide()
+					Send([ActionWebHello,MachineID,!PipeMaster])
+					WR.Each(Send,WebSocketLast)
+					WebSocketPool.add(Send)
+					break
+
+				case ActionWebToken :
+					if (WC.HEXS(TokenStepB(WC.B91P(Q[1]))) === WC.HEXS(WebToken))
+						WN.FileW(FileToken,WC.B91S(TokenStepB(WC.B91P(Q[2]))))
+							.FMap(() => WN.FileR(FileToken))
+							.Now(Q =>
+							{
+								WebToken = WC.B91P(Q)
+								Send([ActionWebToken,true,'New token saved! Connect again'])
+								Suicide()
+							},() => Send([ActionWebToken,false,'Failed to save the new token']))
+					else Send([ActionWebToken,false,'Original token is incorrect'])
+					break
+
 				default : Suicide()
 			}
 		}).on('close',E =>
 		{
 			LogWebSocket('Closed',Timer(),E,Addr)
 			WebSocketPool.delete(Send)
+			Wait.F()
 		})
 		try{S.send(MachineID)}catch(_){}
-		Send(WC.OTJ([ActionWebHello,MachineID,!PipeMaster]))
-		WR.Each(Send,WebSocketLast)
-		WebSocketPool.add(Send)
 	};
 
 	if (null == Log) Log = (H => (...Q) => H(WW.StrDate(),WW.Tick(),'|',...Q))
@@ -488,15 +512,15 @@ module.exports = Option =>
 				Log(MachineID)
 				PipeMaster ? MakeQBH() : MakeMEZ()
 			})
-			.FMap(() => WN.FileR(FileKey)
+			.FMap(() => WN.FileR(FileToken)
 				.ErrAs(K =>
 				(
 					K = WW.Key(20),
 					Log('Key',K),
-					WN.FileW(FileKey,WC.B91S(KeyStepB(KeyStepA(K))))
-						.FMap(() => WC.FileR(FileKey))
+					WN.FileW(FileToken,WC.B91S(TokenStepB(TokenStepA(K))))
+						.FMap(() => WN.FileR(FileToken))
 				)))
-			.Map(Q => {WebKey = WC.B91P(Q)})
+			.Map(Q => {WebToken = WC.B91P(Q)})
 			.Now(),
 		Exp : X => (X || require('express').Router())
 			.use((Q,S,N) => '/' === Q.path && !/\/(\?.*)?$/.test(Q.originalUrl) ? S.redirect(302,Q.baseUrl + Q.url) : N())
