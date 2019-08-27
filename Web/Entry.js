@@ -3,6 +3,7 @@
 {
 	var
 	WW = Wish,
+	WR = WW.R,
 	WC = WW.C,
 	WV = WW.V,
 	Top = Wish.Top,
@@ -12,6 +13,8 @@
 	ActionWebMEZ = 'MEZ',
 	ActionWebPool = 'Pool',
 	ActionWebToken = 'Toke',
+	ActionWebEdit = 'Edit',
+	ActionWebError = 'Err',
 
 	Href = location.href.replace(/[?#].*/,'').replace(/^http/,'ws'),
 
@@ -50,7 +53,7 @@
 						return true
 					}
 				}
-				WebSocketSend([ActionWebHello,Wish.C.B91S(Key)])
+				WebSocketSend([ActionWebHello,WC.B91S(Key)])
 				Q = Key = null
 				return
 			}
@@ -65,7 +68,8 @@
 					Online = Shaked = true
 					NotiOnline('Connected')
 					NotiOnline(false)
-					OnConnect(Q[1],Q[2])
+					MachineID = Q[1]
+					OnConnect(Q[2])
 					break
 				case ActionWebMEZ :
 					OnMEZ(Q[1])
@@ -76,8 +80,12 @@
 					break
 
 				case ActionWebToken :
-					NotiNewToken(Q[2])
+					NotiNewToken(Q[1])
 					NotiNewToken(false)
+					break
+
+				case ActionWebError :
+					Noti.S(['Error | ',Q[1],' | ',Q[2]])
 					break
 
 				default : Suicide()
@@ -103,6 +111,8 @@
 
 	Rainbow = WV.Div(2,['10%'],true),
 	RTab = WV.Split({Pan : Rainbow});
+
+	WV.CSS(Rainbow[1],'min-width',100)
 
 	WV.Style(WW.Fmt
 	(
@@ -192,44 +202,94 @@
 			MakeCard = function()
 			{
 				var
+				ID,
 				U = WV.Rock(ClassCard + ' ' + WV.S4),
+				State = WV.Fmt('[`O`line] `H` (`I`)`M`',{O : 'Off',H : 'Not ready',I : '::'}),
+				MakeEdit = function(Q,S)
+				{
+					var P,R;
+					Q.Foc = function(){P = R.V()}
+					Q.Out = function()
+					{
+						if (P !== (P = R.V())) ID ?
+							WebSocketSend([ActionWebEdit,ID,S,P]) :
+							Noti.S('Not ready, unable to perform')
+					}
+					return R = WV.Inp(Q)
+				},
+				Name = MakeEdit({Hint : 'Unnamed'},'Name'),
+				Desc = MakeEdit({Type : WV.InpPX,Hint : 'No Description'},'Desc'),
+				Last = WV.Fmt('Registered at `O`, totally `L` time(s). Last seen `F` => `T`',{O : '-',L : '-',F : '-',T : '-'}),
 				R =
 				{
 					R : U,
-					I : function(Q)
+					H : function(Q)
 					{
-
+						ID = Q
+						WV.AD(State.H(Q.slice(0,8)).R,'ID',Q)
+						return R
 					},
-					O : function(/**@type {{S : number,IP : string,Boom : number,From : number,To : number}}*/Q)
+					L : function(Q){return State.O(Q ? 'On' : 'Off'),R},
+					M : function(Q){return State.M(Q ? ' (Self)' : ''),R},
+					O : function(/**@type {CrabPoolNS.Pool}*/Q)
 					{
-
+						R.L(Q.S)
+						State.I(Q.IP)
+						Last.O(WW.StrDate(Q.Boom)).L(Q.Num)
+							.F(WW.StrDate(Q.From)).T(Q.S ? 'Now' : WW.StrDate(Q.To))
+						WV.AD(Last.R,'Boom',Q.Boom)
+						WV.AD(Last.R,'From',Q.From)
+						WV.AD(Last.R,'To',Q.S ? null : Q.To)
+						Name.V(Q.Name)
+						Desc.V(Q.Desc)
+						return R
 					},
-					C : function(Q)
-					{
-
-					}
+					D : function(){return WV.Del(U),R}
 				};
+				WV.Ap(WV.ApR([State,Name,Desc,Last],U),V)
 				return R
 			},
-			CardMEZ = MakeCard(
+			CardMEZ = MakeCard(),
+			CardQBH = {},
+			CardCurrent,
+			CardCurrentNew = function(Q)
 			{
-
-			}),
-			CardQBH = [],
-			CardCurrent;
-			OnConnect = function()
+				if (Q && Q !== CardCurrent)
+				{
+					CardCurrent && CardCurrent.M(false)
+					Q.M(true)
+					CardCurrent = Q
+				}
+			};
+			OnConnect = function(Q)
 			{
-
+				CardCurrentNew(Q ? CardMEZ : CardQBH[MachineID])
 			}
-			OnMEZ = function()
-			{
-
-			}
+			OnMEZ = function(Q){CardMEZ.L(Q)}
 			OnPool = function(Q)
 			{
-
+				WR.Each(function(/**@type {CrabPoolNS.Pool}*/V,F)
+				{
+					F = V[0]
+					V = V[1]
+					if (V.MEZ) CardMEZ.H(F).O(V)
+					else if (WR.Has(F,CardQBH)) CardQBH[F].O(V)
+					else
+					{
+						CardQBH[F] = V = MakeCard().H(F).O(V)
+						F === MachineID && CardCurrentNew(V)
+					}
+				},WR.ToPair(Q).sort(function(Q,S)
+				{
+					Q = Q[1]
+					S = S[1]
+					return (Q.Name < S.Name ? -1 : S.Name < Q.Name) ||
+						(Q.Desc < S.Desc ? -1 : S.Desc < Q.Desc) ||
+						Q.Boom - S.Boom
+				}))
+				WR.EachU(function(V,F){WR.Has(F,Q) || V.D()},CardQBH)
 			}
-			WV.ApR([CardMEZ,WV.HR()],V)
+			WV.Ap(WV.HR(),V)
 			return {
 				CSS : function(ID)
 				{

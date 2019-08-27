@@ -13,11 +13,14 @@ ActionWish = 'Wish',
 ActionTake = 'Take',
 ActionPool = 'Pool',
 ActionTick = 'Tick',
+ActionEdit = 'Edit',
 
 ActionWebHello = 'Hell',
 ActionWebMEZ = 'MEZ',
 ActionWebPool = 'Pool',
-ActionWebToken = 'Toke';
+ActionWebToken = 'Toke',
+ActionWebEdit = 'Edit',
+ActionWebError = 'Err';
 
 module.exports = Option =>
 {
@@ -143,12 +146,13 @@ module.exports = Option =>
 						)
 						Pool[MID] = O
 						Record = DataPool.D(MID)
-						if (!Record)
+						if (!Record) Record = DataPool.D(MID,
 						{
-							Record = DataPool.D(MID,{})
-							Record.Boom = WW.Now()
-						}
+							Num : 0,
+							Boom : WW.Now()
+						})
 						Record.S = 9
+						++Record.Num
 						Record.IP = IP
 						Record.From = WW.Now()
 						DataPool.S()
@@ -177,6 +181,10 @@ module.exports = Option =>
 						Partner[PoolKeySec].O([ActionWish])
 						Log('Take')
 						return false
+
+					case ActionEdit :
+						MEZEdit(Q)
+						break
 
 					case ActionTick : break
 
@@ -234,6 +242,15 @@ module.exports = Option =>
 		O[PoolKeySec].O([ActionWish])
 		Log('ACK')
 	},
+	MEZEdit = (Q,S) =>
+	{
+		if (S = DataPool.D(Q[1]))
+		{
+			S[Q[2]] = Q[3]
+			DataPool.S()
+			PoolNotify()
+		}
+	},
 
 	//	Node
 	Online,
@@ -255,8 +272,8 @@ module.exports = Option =>
 				{
 					case ActionHello :
 						Log('Online')
-						WebSocketSend([ActionWebMEZ,Q[1]])
-						Online = true
+						WebSocketSend([ActionWebMEZ,true])
+						Online = Sec
 						break
 					case ActionPool :
 						OnPool(DataPool.O(Q[1]))
@@ -278,7 +295,7 @@ module.exports = Option =>
 				{
 					Log('Closed',Timer(),E)
 					Online = false
-					WebSocketSend([ActionWebMEZ,null])
+					WebSocketSend([ActionWebMEZ,false])
 					Sec.E()
 					O.E()
 				})
@@ -463,6 +480,7 @@ module.exports = Option =>
 			D = Cipher.D(WC.OTJ([WW.Key(WW.Rnd(20,40)),D,WW.Key(WW.Rnd(20,40))]))
 			try{S.send(WC.B91S(D))}catch(_){}
 		},
+		Err = (Q,S) => Send([ActionWebError,Q,S]),
 		Suicide = () => S.terminate(),
 		Wait = WW.To(Timeout,Suicide);
 
@@ -491,10 +509,18 @@ module.exports = Option =>
 							.Now(Q =>
 							{
 								WebToken = WC.B91P(Q)
-								Send([ActionWebToken,true,'New token saved! Connect again'])
+								Send([ActionWebToken,'New token saved! Connect again'])
 								Suicide()
-							},() => Send([ActionWebToken,false,'Failed to save the new token']))
-					else Send([ActionWebToken,false,'Original token is incorrect'])
+							},() => Err(ActionWebToken,'Failed to save the new token'))
+					else Err(ActionWebToken,'Original token is incorrect')
+					break
+
+				case ActionWebEdit :
+					PipeMaster ?
+						Online ?
+							Online.O([ActionEdit,Q[1],Q[2],Q[3]]) :
+							Err(ActionWebEdit,'MEZ is not connected') :
+						MEZEdit(Q)
 					break
 
 				default : Suicide()
@@ -512,6 +538,8 @@ module.exports = Option =>
 		(WN.RollLog({Pre : WN.JoinP(PathLog,'Event')}))
 	LogWeb = MakeLog('Web')
 	LogWebSocket = MakeLog('WebSocket')
+	WR.Each(V => V.S = 0,DataPool.O())
+	DataPool.S()
 
 	return {
 		Log,
@@ -529,9 +557,24 @@ module.exports = Option =>
 						.FMap(() => WN.FileR(FileToken))
 				)))
 			.Map(Q => WebToken = WC.B91P(Q))
-			.Now(() =>
+			.Now(T =>
 			{
 				PipeMaster ? MakeQBH() : MakeMEZ()
+				if (!PipeMaster)
+				{
+					T = DataPool.D(MachineID)
+					if (!T) T = DataPool.D(MachineID,
+					{
+						MEZ : 9,
+						Num : 0,
+						IP : '::1',
+						Boom : WW.Now()
+					})
+					T.S = 9
+					++T.Num
+					T.From = WW.Now()
+					DataPool.S()
+				}
 				Log('========')
 				WW.IsNum(PortWeb) && new (require('ws')).Server({server : WebServer.listen(PortWeb)}).on('connection',OnSocket)
 			}),
