@@ -20,6 +20,12 @@ ActionWebMEZ = 'MEZ',
 ActionWebPool = 'Pool',
 ActionWebToken = 'Toke',
 ActionWebEdit = 'Edit',
+ActionWebLink = 'Link',
+ActionWebLinkS = 'LinkS',
+ActionWebLinkAdd = 'LinkAdd',
+ActionWebLinkSwitch = 'LinkSwitch',
+ActionWebLinkEdit = 'LinkEdit',
+ActionWebLinkError = 'LinkError',
 ActionWebError = 'Err';
 
 module.exports = Option =>
@@ -44,10 +50,12 @@ module.exports = Option =>
 
 	DataPool = WN.JSON(WN.JoinP(PathData,'Pool')),
 	DataLink = WN.JSON(WN.JoinP(PathData,'Link')),
+	DataLinkS = WN.JSON(WN.JoinP(PathData,'LinkS')),
 
 	MachineIDRaw,MachineID,
 	IDSolve = Q => WC.HEXS(WC.SHA512(Q[1])),
 	IDShort = Q => Q.slice(0,8),
+	IDName = Q => Q.slice(0,8) + (Q = DataPool.D(Q),Q && Q.Name ? ':' + Q.Name : ''),
 	Token = WC.Rad(WW.D + WW.AZ + WW.az).S,
 	Counter = (Q = 0) => () => WR.PadS0(4,Token(Q++).toUpperCase()),
 	MakeTime = (Q = WW.Now()) => () => WW.StrMS(WW.Now() - Q),
@@ -112,6 +120,7 @@ module.exports = Option =>
 	Pool = {},
 	PoolNotify = T =>
 	{
+		DataPool.S()
 		T = DataPool.O()
 		WR.Each(V => V[PoolKeySec].O([ActionPool,T]),Pool)
 		OnPool(T)
@@ -155,7 +164,6 @@ module.exports = Option =>
 						++Record.Num
 						Record.IP = IP
 						Record.From = WW.Now()
-						DataPool.S()
 						Sec.O([ActionHello,MachineID])
 						PoolNotify()
 						Log('Node')
@@ -208,7 +216,6 @@ module.exports = Option =>
 					Record.S = 0
 					Record.To = WW.Now()
 					WR.Del(MID,Pool)
-					DataPool.S()
 					PoolNotify()
 				}
 				Partner && Partner[PoolKeyPipe].destroy()
@@ -222,7 +229,7 @@ module.exports = Option =>
 	{
 		var
 		Timer = MakeTime(),
-		Log = MakeLog(`Take ${IDShort(MID)} ${Host}:${Port} ${IDShort(O[PoolKeySID])}`),
+		Log = MakeLog(`Take ${IDName(MID)} ${Host}:${Port} ${IDShort(O[PoolKeySID])}`),
 		S = Net.createConnection({host : Host,port : Port,timeout : Timeout,...SocketOption});
 
 		O[PoolKeyOnPartner](
@@ -247,7 +254,6 @@ module.exports = Option =>
 		if (S = DataPool.D(Q[1]))
 		{
 			S[Q[2]] = Q[3]
-			DataPool.S()
 			PoolNotify()
 		}
 	},
@@ -306,7 +312,7 @@ module.exports = Option =>
 	{
 		var
 		Timer = MakeTime(),
-		Log = MakeLog(`Take ${IDShort(Q[2])} ${Q[3]}:${Q[4]} ${IDShort(Q[1])}`),
+		Log = MakeLog(`Take ${IDName(Q[2])} ${Q[3]}:${Q[4]} ${IDShort(Q[1])}`),
 		S = Net.createConnection({host : Q[3],port : Q[4],timeout : Timeout,...SocketOption}),
 		Sec = MakeSec(M,Q =>
 		{
@@ -344,20 +350,31 @@ module.exports = Option =>
 
 	//	Wish
 	PoolWishKeyServer = WW.Key(),
-	PoolWishKeyPort = WW.Key(),
+	PoolWishKeyUpdate = WW.Key(),
+	PoolWishKeyKill = WW.Key(),
 	PoolWish = {},
-	MakeWish = (Local,Target,Host,Port) =>
+	MakeWish = (ID,Local) =>
 	{
 		var
+		Timer = MakeTime(),
 		Count = Counter(),
+		Log = MakeLog(`Wish ${IDShort(ID)}`),
+		Target,Host,Port,
+		State = DataLinkS.D(ID),
+		Renew,
 		Server = Net.createServer(SocketOption,S =>
 		{
 			var
 			Timer = MakeTime(),
-			Log = MakeLog(`Wish ${Count()} ${IDShort(Target)} ${Host}:${Port}`),
+			Log = MakeLog(`Wish ${IDShort(ID)} ${Count()} ${IDName(Target)} ${Host}:${Port}`),
 			Sec,
 			Partner,SessionID;
+			++State.Visit
+			++State.Using
+			State.Last = WW.Now()
+			LinkSNotify()
 			S.on('error',WW.O)
+				.on('close',() => LinkSNotify(--State.Using))
 			if (PipeMaster) Online ?
 				MakePipe(false,(M,O) =>
 				{
@@ -395,6 +412,29 @@ module.exports = Option =>
 					return () => M.destroy() | S.destroy()
 				}).Now(null,WW.O,() => S.destroy()) :
 				S.destroy()
+			else if (Target === MachineID)
+			{
+				Sec = Net.createConnection({host : Host,port : Port,timeout : Timeout,...SocketOption})
+					.on('error',WW.O)
+					.on('timeout',() => Sec.destroy())
+					.on('close',E =>
+					{
+						Log('Closed',Timer(),E)
+						S.destroy()
+					})
+					.on('data',Q => S.write(Q))
+					.on('end',() => S.end())
+				S.setTimeout(Timeout)
+					.on('error',WW.O)
+					.on('timeout',() => S.destroy())
+					.on('close',E =>
+					{
+						Log('Closed',Timer(),E)
+						Sec.destroy()
+					})
+					.on('data',Q => Sec.write(Q))
+					.on('end',() => Sec.end())
+			}
 			else if (WR.Has(Target,Pool))
 			{
 				PoolPartner[SessionID = WW.Key(32)] =
@@ -425,20 +465,52 @@ module.exports = Option =>
 		}).listen(Local)
 			.on('listening',() =>
 			{
-				O[PoolWishKeyPort] = Server.address().port
-				MakeLog(`Wish ${IDShort(Target)} ${Host}:${Port}`)('Deployed at',O[PoolWishKeyPort])
+				Log('Deployed at',State.Port = Server.address().port)
+				DataLinkS.s
+				LinkSNotify()
+				WebSocketSend([ActionWebLinkError,ID])
+			})
+			.on('close',() => Log('Closed',Timer()))
+			.on('error',E =>
+			{
+				WebSocketSend([ActionWebLinkError,ID,String(E)])
+				Renew = setTimeout(() => MakeWish(ID,Local)[PoolWishKeyUpdate](Target,Host + ':' + Port,true),5E3)
 			}),
 		O =
 		{
 			[PoolWishKeyServer] : Server,
-			[PoolWishKeyPort] : Port
+			[PoolWishKeyUpdate] : (H,P,L) =>
+			{
+				Target = H
+				P = P.split(':')
+				Port = WR.Fit(0,0 | P.pop(),65535)
+				Host = P.join(':')
+				L || Log(`Target ${IDName(Target)} ${Host}:${Port}`)
+			},
+			[PoolWishKeyKill] : () =>
+			{
+				undefined === Renew || clearTimeout(Renew)
+				Server.close()
+			}
 		};
-		PoolWish[Local] = O
+		State.Port = -1
+		LinkSNotify()
+		return PoolWish[ID] = O
 	},
 
 
 
 	//	Web
+	LinkNotify = () =>
+	{
+		DataLink.S()
+		WebSocketSend([ActionWebLink,DataLink.O()])
+	},
+	LinkSNotify = () =>
+	{
+		DataLinkS.S()
+		WebSocketSend([ActionWebLinkS,DataLinkS.O()])
+	},
 	LogWeb,
 	WebServerMap =
 	{
@@ -482,10 +554,17 @@ module.exports = Option =>
 		},
 		Err = (Q,S) => Send([ActionWebError,Q,S]),
 		Suicide = () => S.terminate(),
-		Wait = WW.To(Timeout,Suicide);
+		Wait = WW.To(Timeout,Suicide),
+
+		CheckLink = (H,Q) =>
+			!Q[1] ? Err(H,'Host is required') :
+			!DataPool.D(Q[1]) ? Err(H,'Invalid host') :
+			!Q[2] ? Err(H,'Address is required') :
+			!WW.IsSafe(Q[3] = +Q[3]) || Q[3] < 0 || 65535 < Q[3] ? Err(H,'Port should be a number in range [0,65535]') :
+			true;
 
 		LogWebSocket('Accepted',Addr)
-		S.on('message',Q =>
+		S.on('message',(Q,T) =>
 		{
 			Wait.D()
 			Q = Decipher.D(WC.B91P(Q))
@@ -523,6 +602,64 @@ module.exports = Option =>
 						MEZEdit(Q)
 					break
 
+				case ActionWebLinkAdd :
+					if (CheckLink(ActionWebLinkAdd,Q))
+					{
+						DataLink.D(T = WW.Key(32),
+						{
+							S : 9,
+							Boom : WW.Now(),
+							Host : Q[1],
+							Addr : Q[2],
+							Port : Q[3]
+						})
+						DataLinkS.D(T,
+						{
+							Visit : 0,
+							Using : 0,
+							Port : -9
+						})
+						MakeWish(T,Q[3])[PoolWishKeyUpdate](Q[1],Q[2])
+						LinkNotify()
+						LinkSNotify()
+					}
+					break
+				case ActionWebLinkEdit :
+					if (CheckLink(ActionWebLinkEdit,Q))
+					{
+						if (T = DataLink.D(Q[4]))
+						{
+							if (T.S && T.Port !== Q[3])
+							{
+								PoolWish[Q[4]][PoolWishKeyKill]()
+								MakeWish(Q[4],Q[3])
+							}
+							T.Host = Q[1]
+							T.Addr = Q[2]
+							T.Port = Q[3]
+							T.S && PoolWish[Q[4]][PoolWishKeyUpdate](T.Host,T.Addr)
+							LinkNotify()
+						}
+						else Err(ActionWebLinkEdit,'Unable to edit nonexistent links')
+					}
+					break
+				case ActionWebLinkSwitch :
+					if ((T = DataLink.D(Q[1])) && !Q[2] !== !T.S)
+					{
+						if (T.S = Q[2] ? 9 : 0)
+							MakeWish(Q[1],T.Port)[PoolWishKeyUpdate](T.Host,T.Addr)
+						else
+						{
+							PoolWish[Q[1]][PoolWishKeyKill]()
+							WR.Del(Q[1],PoolWish)
+							DataLinkS.D(Q[1]).Port = -1
+							LinkSNotify()
+						}
+						LinkNotify()
+					}
+					else Err(ActionWebLinkSwitch,'Invalid host')
+					break
+
 				default : Suicide()
 			}
 		}).on('close',E =>
@@ -539,7 +676,6 @@ module.exports = Option =>
 	LogWeb = MakeLog('Web')
 	LogWebSocket = MakeLog('WebSocket')
 	WR.Each(V => V.S = 0,DataPool.O())
-	DataPool.S()
 
 	return {
 		Log,
@@ -573,10 +709,15 @@ module.exports = Option =>
 					T.S = 9
 					++T.Num
 					T.From = WW.Now()
-					DataPool.S()
 				}
+				PoolNotify()
+				LinkNotify()
 				Log('========')
 				WW.IsNum(PortWeb) && new (require('ws')).Server({server : WebServer.listen(PortWeb)}).on('connection',OnSocket)
+				WR.EachU((V,F) =>
+				{
+					V.S && MakeWish(F,V.Port)[PoolWishKeyUpdate](V.Host,V.Addr)
+				},DataLink.O())
 			}),
 		Exp : X => (X || require('express').Router())
 			.use((Q,S,N) => '/' === Q.path && !/\/(\?.*)?$/.test(Q.originalUrl) ? S.redirect(302,Q.baseUrl + Q.url) : N())

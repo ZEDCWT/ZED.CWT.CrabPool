@@ -17,9 +17,9 @@ declare module CrabPoolNS
 			Log? : ((...Q : any[]) => any) | false
 		}) : {
 			Log(...Q : any[]) : any
-			// Express.Router
-			Exp : object
-			// WS.on('connection')
+			/**Express.Router*/
+			Exp(Express? : object) : object
+			/**WS.on('connection')*/
 			Soc : Function
 		}
 	}
@@ -32,9 +32,25 @@ declare module CrabPoolNS
 		IP : string
 		Boom : number
 		From : number
-		To : number
+		To? : number
 		Name? : string
 		Desc? : string
+	}
+
+	interface Link
+	{
+		S : boolean
+		Boom : number
+		Host : string
+		Addr : string
+		Port : number
+	}
+	interface LinkS
+	{
+		Visit : number
+		Using : number
+		Last : number
+		Port : number
 	}
 }
 declare module 'crabpool'
