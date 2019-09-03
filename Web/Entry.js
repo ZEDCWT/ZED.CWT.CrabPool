@@ -8,17 +8,20 @@
 	WV = WW.V,
 	Top = Wish.Top,
 	WebSocket = Top.WebSocket,
+	Confirm = Top.confirm,
 
 	ActionWebHello = 'Hell',
 	ActionWebMEZ = 'MEZ',
-	ActionWebPool = 'Pool',
 	ActionWebToken = 'Toke',
-	ActionWebEdit = 'Edit',
+	ActionWebPool = 'Pool',
+	ActionWebPoolEdit = 'PoolEdit',
+	ActionWebPoolDel = 'PoolDel',
 	ActionWebLink = 'Link',
 	ActionWebLinkS = 'LinkS',
 	ActionWebLinkAdd = 'LinkAdd',
 	ActionWebLinkSwitch = 'LinkSwitch',
 	ActionWebLinkEdit = 'LinkEdit',
+	ActionWebLinkDel = 'LinkDel',
 	ActionWebLinkError = 'LinkError',
 	ActionWebError = 'Err',
 
@@ -26,6 +29,7 @@
 
 	Href = location.href.replace(/[?#].*/,'').replace(/^http/,'ws'),
 	IDShort = function(Q){return Q.slice(0,8)},
+	Sure = function(Q,S){Confirm(Q) && S()},
 
 	Noti = WV.Noti(),
 	NotiOnline = Noti.O(),
@@ -225,8 +229,9 @@
 			MakeCard = function()
 			{
 				var
-				ID,
-				U = WV.Rock(ClassCard + ' ' + WV.S4),
+				ID,O,
+				U = WV.Rock(ClassCard + ' ' + WV.S4,'fieldset'),
+				Index = WV.A('legend'),
 				State = WV.Fmt('[`O`line] `H` (`I`)`M`',{O : 'Off',H : 'Not ready',I : '::'}),
 				MakeEdit = function(Q,S)
 				{
@@ -235,7 +240,7 @@
 					Q.Out = function()
 					{
 						if (P !== (P = R.V())) ID ?
-							WebSocketSend([ActionWebEdit,ID,S,P]) :
+							WebSocketSend([ActionWebPoolEdit,ID,S,P]) :
 							Noti.S('Not ready, unable to perform')
 					}
 					return R = WV.Inp(Q)
@@ -243,9 +248,27 @@
 				Name = MakeEdit({Hint : 'Unnamed'},'Name'),
 				Desc = MakeEdit({Type : WV.InpPX,Hint : 'No Description'},'Desc'),
 				Last = WV.Fmt('Created at `O`. Total : `L`. Last on `F` => `T`',{O : '-',L : '-',F : '-',T : '-'}),
+				Del = WV.But(
+				{
+					X : 'Delete',
+					The : WV.TheP,
+					C : function()
+					{
+						if (ID)
+						{
+							Sure(
+							[
+								'Sure to remove this machine?',
+								IDShort(ID) + (O.Name ? ':' + O.Name : ''),
+								V.Desc || ''
+							].join('\n'),function(){WebSocketSend([ActionWebPoolDel,ID])})
+						}
+					}
+				}).Off(),
 				R =
 				{
 					R : U,
+					I : function(Q,S){return WV.Text(Index,Q + ' / ' + S),R},
 					H : function(Q)
 					{
 						ID = Q
@@ -256,6 +279,7 @@
 					M : function(Q){return State.M(Q ? ' (Self)' : ''),R},
 					O : function(/**@type {CrabPoolNS.Pool}*/Q)
 					{
+						O = Q
 						R.L(Q.S)
 						State.I(Q.IP)
 						Last.O(WW.StrDate(Q.Boom)).L(Q.Num)
@@ -265,11 +289,12 @@
 						WV.AD(Last.R,'To',Q.S ? null : Q.To)
 						Name.V(Q.Name)
 						Desc.V(Q.Desc)
+						Q.S ? Del.Off() : Del.On()
 						return R
 					},
 					D : function(){return WV.Del(U),R}
 				};
-				WV.Ap(WV.ApR([State,Name,Desc,Last],U),V)
+				WV.Ap(WV.ApR([Index,State,Name,Desc,Last,Del],U),V)
 				return R
 			},
 			CardMEZ = MakeCard(),
@@ -292,18 +317,19 @@
 			OnPoolPool = function()
 			{
 				PoolIndex = {}
-				WR.Each(function(/**@type {CrabPoolNS.Pool}*/V,F)
+				WR.EachU(function(/**@type {CrabPoolNS.Pool}*/V,I,F)
 				{
 					PoolIndex[V[0]] = F
 					F = V[0]
 					V = V[1]
-					if (V.MEZ) CardMEZ.H(F).O(V)
-					else if (WR.Has(F,CardQBH)) CardQBH[F].O(V)
+					if (V.MEZ) V = CardMEZ.H(F).O(V)
+					else if (WR.Has(F,CardQBH)) V = CardQBH[F].O(V)
 					else
 					{
 						CardQBH[F] = V = MakeCard().H(F).O(V)
 						F === MachineID && CardCurrentNew(V)
 					}
+					V.I(WR.PadU(I,DataPoolList.length),DataPoolList.length)
 				},DataPoolList)
 				WR.EachU(function(V,F){WR.Has(F,DataPoolMap) || V.D()},CardQBH)
 			}
@@ -315,7 +341,9 @@
 					(
 						'#`R`>*{margin:20px}' +
 						'.`C`{padding:20px}' +
-						'.`C`>*{margin:10px 0}',
+						'fieldset.`C`{padding:4px 20px 20px}' +
+						'.`C`>*{margin:4px 0}' +
+						'.`C` legend{margin:0}',
 						{
 							R : ID,
 							C : ClassCard,
@@ -333,11 +361,12 @@
 			HostMap = {},
 			HostMapInv = {},
 			HostPool = WW.Set(),
+			MakeHostFilter = function(S,_,Q){return Q.test(S[0]) || Q.test(S[2])},
 			MakeHost = function()
 			{
 				var
 				M,
-				U = WV.Inp({Hint : 'Select A Target'}).Drop(HostSel),
+				U = WV.Inp({Hint : 'Select A Target'}).Drop(HostSel,MakeHostFilter),
 				R =
 				{
 					R : U.R,
@@ -346,7 +375,7 @@
 						if (Q.length)
 						{
 							T = U.V()
-							U.On().Drop(Q)
+							U.On().Drop(Q,MakeHostFilter)
 							if (M) U.V(HostMapInv[M[T]])
 							M = HostMap
 						}
@@ -368,8 +397,9 @@
 			MakeCard = function()
 			{
 				var
-				ID,
-				U = WV.Rock(ClassCard + ' ' + WV.S4),
+				ID,O,
+				U = WV.Rock(ClassCard + ' ' + WV.S4,'fieldset'),
+				Index = WV.A('legend'),
 				Enabled = WV.Cho({Set : [[9,'Enabled'],[0,'Disabled']],Inp : function(V)
 				{
 					WebSocketSend([ActionWebLinkSwitch,ID,V])
@@ -387,12 +417,28 @@
 						WebSocketSend([ActionWebLinkEdit,Host.V(),Addr.V(),Deploy.V(),ID])
 					}
 				}),
+				Del = WV.But(
+				{
+					X : 'Delete',
+					The : WV.TheP,
+					C : function()
+					{
+						Sure(
+						[
+							'Sure to remove this link?',
+							'[' + O.Port + '] ' + HostMapInv[O.Host],
+							O.Addr
+						].join('\n'),function(){WebSocketSend([ActionWebLinkDel,ID])})
+					}
+				}),
 				R =
 				{
 					R : U,
+					I : function(Q,S){return WV.Text(Index,Q + ' / ' + S),R},
 					H : function(Q){return ID = Q,R},
 					O : function(/**@type {CrabPoolNS.Link}*/Q)
 					{
+						O = Q
 						Enabled.V(Q.S ? 9 : 0,true)
 						WV.AD(State.C(WW.StrDate(Q.Boom)).R,'Boom',Q.Boom)
 						Host.V(Q.Host)
@@ -410,9 +456,15 @@
 					{
 						State.E(Q ? '\n' + Q : '')
 						return R
+					},
+					D : function()
+					{
+						WV.Del(U)
+						WW.SetDel(HostPool,Host)
+						return R
 					}
 				};
-				WV.After(WV.ApR([Enabled,Host,Addr,Deploy,State,Save],U),HR)
+				WV.After(WV.ApR([Index,Enabled,Host,Addr,Deploy,State,Save,Del],U),HR)
 				return R
 			},
 
@@ -427,10 +479,10 @@
 				The : WV.TheO,
 				C : function()
 				{
-					WebSocketSend([ActionWebLinkAdd,SaveHost.V(),SaveAddr.V(),SaveDeploy.V()])
-					SaveHost.V('')
-					SaveAddr.V('')
-					SaveDeploy.V('')
+					if (WebSocketSend([ActionWebLinkAdd,SaveHost.V(),SaveAddr.V(),SaveDeploy.V()]))
+					{
+						SaveDeploy.V('')
+					}
 				}
 			});
 			OnPoolLink = function()
@@ -444,18 +496,20 @@
 					P = IDShort(F) + (V.Name ? ':' + V.Name : '')
 					HostMap[P] = F
 					HostMapInv[F] = P
-					return [P,[P,V.Desc ? function(){return WV.Text(WV.Rock(ClassDesc),V.Desc)} : '']]
+					return [P,[P,V.Desc ? function(){return WV.Text(WV.Rock(ClassDesc),V.Desc)} : ''],V.Desc]
 				},DataPoolList)
 				WR.Each(function(V){V.S(HostSel)},HostPool)
 			}
-			OnLink = function(Q)
+			OnLink = function(Q,S)
 			{
-				WR.Each(function(V,F)
+				WR.EachU(function(V,I,F)
 				{
 					F = V[0]
 					V = V[1]
-					;(CardPool[F] || (CardPool[F] = MakeCard().H(F))).O(V)
-				},WR.ToPair(Q).sort(function(Q,S)
+					;(CardPool[F] || (CardPool[F] = MakeCard().H(F)))
+						.I(WR.PadU(S.length + ~I,S.length),S.length)
+						.O(V)
+				},S = WR.ToPair(Q).sort(function(Q,S)
 				{
 					Q = Q[1]
 					S = S[1]
@@ -463,6 +517,7 @@
 						S.Port - Q.Port ||
 						(S.Addr < Q.Addr ? -1 : Q.Addr < S.Addr)
 				}))
+				WR.EachU(function(V,F){WR.Has(F,Q) || V.D()},CardPool)
 			}
 			OnLinkS = function(Q)
 			{

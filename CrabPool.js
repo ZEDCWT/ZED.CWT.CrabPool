@@ -7,24 +7,27 @@ Net = require('net'),
 
 SocketOption = {allowHalfOpen : true},
 
-ActionError = 'Err',
 ActionHello = 'Hell',
 ActionWish = 'Wish',
 ActionTake = 'Take',
 ActionPool = 'Pool',
+ActionPoolEdit = 'PoolEdit',
+ActionPoolDel = 'PoolDel',
 ActionTick = 'Tick',
-ActionEdit = 'Edit',
+ActionError = 'Err',
 
 ActionWebHello = 'Hell',
 ActionWebMEZ = 'MEZ',
-ActionWebPool = 'Pool',
 ActionWebToken = 'Toke',
-ActionWebEdit = 'Edit',
+ActionWebPool = 'Pool',
+ActionWebPoolEdit = 'PoolEdit',
+ActionWebPoolDel = 'PoolDel',
 ActionWebLink = 'Link',
 ActionWebLinkS = 'LinkS',
 ActionWebLinkAdd = 'LinkAdd',
 ActionWebLinkSwitch = 'LinkSwitch',
 ActionWebLinkEdit = 'LinkEdit',
+ActionWebLinkDel = 'LinkDel',
 ActionWebLinkError = 'LinkError',
 ActionWebError = 'Err';
 
@@ -190,8 +193,11 @@ module.exports = Option =>
 						Log('Take')
 						return false
 
-					case ActionEdit :
-						MEZEdit(Q)
+					case ActionPoolEdit :
+						MEZPoolEdit(Q)
+						break
+					case ActionPoolDel :
+						MEZPoolDel(Q)
 						break
 
 					case ActionTick : break
@@ -249,13 +255,19 @@ module.exports = Option =>
 		O[PoolKeySec].O([ActionWish])
 		Log('ACK')
 	},
-	MEZEdit = (Q,S) =>
+	MEZPoolEditValid = new Set(['Name','Desc']),
+	MEZPoolEdit = (Q,S) =>
 	{
-		if (S = DataPool.D(Q[1]))
+		if ((S = DataPool.D(Q[1])) && MEZPoolEditValid.has(Q[2]))
 		{
 			S[Q[2]] = Q[3]
 			PoolNotify()
 		}
+	},
+	MEZPoolDel = Q =>
+	{
+		DataPool.D(Q[1],null)
+		PoolNotify()
 	},
 
 	//	Node
@@ -594,12 +606,19 @@ module.exports = Option =>
 					else Err(ActionWebToken,'Original token is incorrect')
 					break
 
-				case ActionWebEdit :
+				case ActionWebPoolEdit :
 					PipeMaster ?
 						Online ?
-							Online.O([ActionEdit,Q[1],Q[2],Q[3]]) :
-							Err(ActionWebEdit,'MEZ is not connected') :
-						MEZEdit(Q)
+							Online.O([ActionPoolEdit,Q[1],Q[2],Q[3]]) :
+							Err(ActionWebPoolEdit,'Master is not connected') :
+						MEZPoolEdit(Q)
+					break
+				case ActionWebPoolDel :
+					PipeMaster ?
+						Online ?
+							Online.O([ActionPoolDel,Q[1]]) :
+							Err(ActionWebPoolDel,'Master is not connected') :
+						MEZPoolDel(Q)
 					break
 
 				case ActionWebLinkAdd :
@@ -658,6 +677,19 @@ module.exports = Option =>
 						LinkNotify()
 					}
 					else Err(ActionWebLinkSwitch,'Invalid host')
+					break
+				case ActionWebLinkDel :
+					if (T = DataLink.D(Q[1]))
+					{
+						if (T.S)
+						{
+							PoolWish[Q[1]][PoolWishKeyKill]()
+							WR.Del(Q[1],PoolWish)
+						}
+						DataLink.D(Q[1],null)
+						DataLinkS.D(Q[1],null)
+						LinkNotify()
+					}
 					break
 
 				default : Suicide()
