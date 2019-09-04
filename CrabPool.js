@@ -8,6 +8,8 @@ Net = require('net'),
 SocketOption = {allowHalfOpen : true},
 
 ActionHello = 'Hell',
+ActionPing = 'Ping',
+ActionPong = 'Pong',
 ActionWish = 'Wish',
 ActionTake = 'Take',
 ActionPool = 'Pool',
@@ -22,6 +24,7 @@ ActionWebToken = 'Toke',
 ActionWebPool = 'Pool',
 ActionWebPoolEdit = 'PoolEdit',
 ActionWebPoolDel = 'PoolDel',
+ActionWebPing = 'Ping',
 ActionWebLink = 'Link',
 ActionWebLinkS = 'LinkS',
 ActionWebLinkAdd = 'LinkAdd',
@@ -65,6 +68,28 @@ module.exports = Option =>
 	WebToken,
 	TokenStepA = Q => WC.HSHA512(Q,MachineID),
 	TokenStepB = Q => WC.HSHA512(MachineID,Q),
+
+	DataPing = {},
+	MakePing = (H,W) =>
+	{
+		var
+		K,M,N,
+		Fin = () => null == M || clearTimeout(M),
+		Roll = () => Fin(H(K = WW.Key(16)),N = WW.Now());
+		return {
+			R : Roll,
+			O : S =>
+			{
+				if (K && S === K)
+				{
+					W(WW.Now() - N)
+					K = null
+					M = setTimeout(Roll,Timeout)
+				}
+			},
+			F : Fin
+		}
+	},
 
 	MakeSec = (Pipe,OnJSON,OnRaw) =>
 	{
@@ -121,11 +146,12 @@ module.exports = Option =>
 	PoolKeySec = WW.Key(),
 	PoolKeyOnPartner = WW.Key(),
 	Pool = {},
+	PoolO = Q => WR.Each(V => V[PoolKeySec].O(Q),Pool),
 	PoolNotify = T =>
 	{
 		DataPool.S()
 		T = DataPool.O()
-		WR.Each(V => V[PoolKeySec].O([ActionPool,T]),Pool)
+		PoolO([ActionPool,T])
 		OnPool(T)
 	},
 	PoolPartner = {},
@@ -143,6 +169,11 @@ module.exports = Option =>
 			Err = Q => Sec.O([ActionError,Q]) || S.destroy(),
 			Partner,
 			Record,
+			Ping = MakePing(Q => Sec.O([ActionPing,Q]),Q =>
+			{
+				DataPing[MID] = Q
+				PoolO([ActionPing,MID,Q])
+			}),
 			Sec = MakeSec(S,Q =>
 			{
 				switch (Q[0])
@@ -170,6 +201,14 @@ module.exports = Option =>
 						Sec.O([ActionHello,MachineID])
 						PoolNotify()
 						Log('Node')
+						Sec.O([ActionPing,DataPing])
+						Ping.R()
+						break
+					case ActionPing :
+						Sec.O([ActionPong,Q[1]])
+						break
+					case ActionPong :
+						Ping.O(Q[1])
 						break
 
 					case ActionWish :
@@ -216,6 +255,7 @@ module.exports = Option =>
 			S.on('close',E =>
 			{
 				Log('Closed',Timer(),E)
+				Ping.F()
 				Sec.E()
 				if (MID && Pool[MID] && SessionID === Pool[MID][PoolKeySID])
 				{
@@ -284,14 +324,34 @@ module.exports = Option =>
 			var
 			Timer = MakeTime(),
 			Log = MakeLog(`QBH ${Count()}`),
+			MEZID,
+			Ping = MakePing(Q => Sec.O([ActionPing,Q]),Q =>
+			{
+				DataPing[MEZID] = Q
+				WebSocketSend([ActionWebPing,MEZID,Q],true)
+			}),
 			Sec = MakeSec(M,Q =>
 			{
 				switch (Q[0])
 				{
 					case ActionHello :
 						Log('Online')
+						MEZID = Q[1]
 						WebSocketSend([ActionWebMEZ,true])
 						Online = Sec
+						Ping.R()
+						break
+					case ActionPing :
+						if (WW.IsObj(Q[1])) WebSocketSend([ActionWebPing,DataPing = Q[1]],true)
+						else if (WW.IsNum(Q[2]))
+						{
+							DataPing[Q[1]] = Q[2]
+							WebSocketSend([ActionWebPing,Q[1],Q[2]],true)
+						}
+						else Sec.O([ActionPong,Q[1]])
+						break
+					case ActionPong :
+						Ping.O(Q[1])
 						break
 					case ActionPool :
 						OnPool(DataPool.O(Q[1]))
@@ -314,6 +374,7 @@ module.exports = Option =>
 					Log('Closed',Timer(),E)
 					Online = false
 					WebSocketSend([ActionWebMEZ,false])
+					Ping.F()
 					Sec.E()
 					O.E()
 				})
@@ -546,9 +607,9 @@ module.exports = Option =>
 	LogWebSocket,
 	WebSocketPool = new Set,
 	WebSocketLast = {[ActionWebPool] : [ActionWebPool,DataPool.O()]},
-	WebSocketSend = Q =>
+	WebSocketSend = (Q,S) =>
 	{
-		WebSocketLast[Q[0]] = Q
+		if (!S) WebSocketLast[Q[0]] = Q
 		WebSocketPool.forEach(V => V(Q))
 	},
 	OnPool = Q => WebSocketSend([ActionWebPool,Q]),
@@ -590,6 +651,7 @@ module.exports = Option =>
 					if (WC.HEXS(TokenStepB(WC.B91P(Q[1]))) !== WC.HEXS(WebToken)) return Suicide()
 					Send([ActionWebHello,MachineID,!PipeMaster])
 					WR.Each(Send,WebSocketLast)
+					Send([ActionWebPing,DataPing])
 					WebSocketPool.add(Send)
 					break
 

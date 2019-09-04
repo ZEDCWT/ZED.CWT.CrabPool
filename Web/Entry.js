@@ -16,6 +16,7 @@
 	ActionWebPool = 'Pool',
 	ActionWebPoolEdit = 'PoolEdit',
 	ActionWebPoolDel = 'PoolDel',
+	ActionWebPing = 'Ping',
 	ActionWebLink = 'Link',
 	ActionWebLinkS = 'LinkS',
 	ActionWebLinkAdd = 'LinkAdd',
@@ -106,6 +107,10 @@
 					OnPoolLink()
 					break
 
+				case ActionWebPing :
+					OnPing(Q[1],Q[2])
+					break
+
 				case ActionWebLink :
 					OnLink(Q[1])
 					break
@@ -140,7 +145,7 @@
 	},
 
 	DataPoolMap = {},DataPoolList = [],
-	OnConnect,OnMEZ,OnPoolPool,
+	OnConnect,OnMEZ,OnPoolPool,OnPing,
 	OnPoolLink,OnLink,OnLinkS,OnLinkError,
 	PoolIndex = {},
 
@@ -232,7 +237,7 @@
 				ID,O,
 				U = WV.Rock(ClassCard + ' ' + WV.S4,'fieldset'),
 				Index = WV.A('legend'),
-				State = WV.Fmt('[`O`line] `H` (`I`)`M`',{O : 'Off',H : 'Not ready',I : '::'}),
+				State = WV.Fmt('[`O`line`P`] `H` (`I`)`M`',{O : 'Off',H : 'Not ready',I : '::'}),
 				MakeEdit = function(Q,S)
 				{
 					var P,R;
@@ -275,7 +280,7 @@
 						WV.AD(State.H(IDShort(Q)).R,'ID',Q)
 						return R
 					},
-					L : function(Q){return State.O(Q ? 'On' : 'Off'),R},
+					L : function(Q){return State.O(Q ? 'On' : 'Off'),Q || State.P(''),R},
 					M : function(Q){return State.M(Q ? ' (Self)' : ''),R},
 					O : function(/**@type {CrabPoolNS.Pool}*/Q)
 					{
@@ -290,6 +295,11 @@
 						Name.V(Q.Name)
 						Desc.V(Q.Desc)
 						Q.S ? Del.Off() : Del.On()
+						return R
+					},
+					P : function(Q)
+					{
+						State.P(' ' + Q + 'ms')
 						return R
 					},
 					D : function(){return WV.Del(U),R}
@@ -319,10 +329,10 @@
 				PoolIndex = {}
 				WR.EachU(function(/**@type {CrabPoolNS.Pool}*/V,I,F)
 				{
-					PoolIndex[V[0]] = F
+					PoolIndex[V[0]] = I
 					F = V[0]
 					V = V[1]
-					if (V.MEZ) V = CardMEZ.H(F).O(V)
+					if (V.MEZ) CardQBH[F] = V = CardMEZ.H(F).O(V)
 					else if (WR.Has(F,CardQBH)) V = CardQBH[F].O(V)
 					else
 					{
@@ -332,6 +342,13 @@
 					V.I(WR.PadU(I,DataPoolList.length),DataPoolList.length)
 				},DataPoolList)
 				WR.EachU(function(V,F){WR.Has(F,DataPoolMap) || V.D()},CardQBH)
+			}
+			OnPing = function(Q,S)
+			{
+				WR.EachU(function(V,F)
+				{
+					WR.Has(F,CardQBH) && CardQBH[F].P(V)
+				},WW.IsObj(Q) ? Q : WR.OfObj(Q,S))
 			}
 			WV.Ap(WV.HR(),V)
 			return {
