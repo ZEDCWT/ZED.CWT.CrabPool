@@ -234,7 +234,7 @@
 			MakeCard = function()
 			{
 				var
-				ID,O,
+				ID,O,IP,
 				U = WV.Rock(ClassCard + ' ' + WV.S4,'fieldset'),
 				Index = WV.A('legend'),
 				State = WV.Fmt('[`O`line`P`] `H` (`I`)`M`',{O : 'Off',H : 'Not ready',I : '::'}),
@@ -255,7 +255,7 @@
 				Last = WV.Fmt('Created at `O`. Total : `L`. Last on `F` => `T`',{O : '-',L : '-',F : '-',T : '-'}),
 				Del = WV.But(
 				{
-					X : 'Delete',
+					X : 'Remove',
 					The : WV.TheP,
 					C : function()
 					{
@@ -280,13 +280,20 @@
 						WV.AD(State.H(IDShort(Q)).R,'ID',Q)
 						return R
 					},
-					L : function(Q){return State.O(Q ? 'On' : 'Off'),Q || State.P(''),R},
+					L : function(Q)
+					{
+						State.O(Q ? 'On' : 'Off')
+						Q ?
+							WW.IsStr(Q) && State.I(IP = Q) :
+							State.P('')
+						return R
+					},
 					M : function(Q){return State.M(Q ? ' (Self)' : ''),R},
 					O : function(/**@type {CrabPoolNS.Pool}*/Q)
 					{
 						O = Q
 						R.L(Q.S)
-						State.I(Q.IP)
+						IP || State.I(Q.IP)
 						Last.O(WW.StrDate(Q.Boom)).L(Q.Num)
 							.F(WW.StrDate(Q.From)).T(Q.S ? 'Now' : WW.StrDate(Q.To))
 						WV.AD(Last.R,'Boom',Q.Boom)
@@ -436,7 +443,7 @@
 				}),
 				Del = WV.But(
 				{
-					X : 'Delete',
+					X : 'Remove',
 					The : WV.TheP,
 					C : function()
 					{

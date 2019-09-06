@@ -5,11 +5,11 @@ declare module CrabPoolNS
 	{
 		(Q :
 		{
-			Cipher() : WishNS.Algo
-			Decipher() : WishNS.Algo
+			Cipher() : WishNS.Algo | {data(Q : Buffer) : Buffer}
+			Decipher() : WishNS.Algo | {data(Q : Buffer) : Buffer}
 			PortMaster? : number
 			PortWeb? : number
-			Pipe(Control : boolean,Log? : (...Q : any[]) => any) : Net.Socket | WishNS.Provider<Net.Socket>
+			Pipe?(Control : boolean,Log : (...Q : any[]) => any) : Net.Socket | WishNS.Provider<Net.Socket>
 			Retry? : number
 			Timeout? : number
 			Tick? : number

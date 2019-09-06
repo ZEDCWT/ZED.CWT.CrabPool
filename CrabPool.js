@@ -68,6 +68,7 @@ module.exports = Option =>
 	WebToken,
 	TokenStepA = Q => WC.HSHA512(Q,MachineID),
 	TokenStepB = Q => WC.HSHA512(MachineID,Q),
+	RemoteIP = Q => Q.remoteAddress + ':' + Q.remotePort,
 
 	DataPing = {},
 	MakePing = (H,W) =>
@@ -91,10 +92,11 @@ module.exports = Option =>
 		}
 	},
 
+	EnsureD = Q => Q.D ? Q : {D : S => Q.data(S)},
 	MakeSec = (Pipe,OnJSON,OnRaw) =>
 	{
 		var
-		C = Cipher(),D = Decipher(),
+		C = EnsureD(Cipher()),D = EnsureD(Decipher()),
 
 		Cache = [],CacheLen = 0,
 		Take = function*(Q,R)
@@ -163,7 +165,7 @@ module.exports = Option =>
 		{
 			var
 			Timer = MakeTime(),
-			IP = `${S.remoteAddress}:${S.remotePort}`,
+			IP = RemoteIP(S),
 			Log = MakeLog(`MEZ ${Count()} ${IP}`),
 			MID,SessionID = WW.Key(32),
 			Err = Q => Sec.O([ActionError,Q]) || S.destroy(),
@@ -269,7 +271,7 @@ module.exports = Option =>
 			}).on('end',() => Partner && Partner[PoolKeyPipe].end())
 			Log('Connected')
 		}).listen(PortMaster || 0)
-			.on('listening',() => MakeLog('MEZ','Listening',Master.address()));
+			.on('listening',() => MakeLog('MEZ')('Listening',Master.address().port));
 	},
 	MakeMEZTake = (O,MID,Host,Port) =>
 	{
@@ -337,7 +339,7 @@ module.exports = Option =>
 					case ActionHello :
 						Log('Online')
 						MEZID = Q[1]
-						WebSocketSend([ActionWebMEZ,true])
+						WebSocketSend([ActionWebMEZ,RemoteIP(M)])
 						Online = Sec
 						Ping.R()
 						break
@@ -617,7 +619,7 @@ module.exports = Option =>
 	{
 		var
 		Timer = MakeTime(),
-		Addr = H.connection.remoteAddress + ':' + H.connection.remotePort,
+		Addr = RemoteIP(H.connection),
 		Cipher = WC.AESES(WebToken,WebToken,WC.CFB),
 		Decipher = WC.AESDS(WebToken,WebToken,WC.CFB),
 		Send = D =>
@@ -797,7 +799,7 @@ module.exports = Option =>
 					{
 						MEZ : 9,
 						Num : 0,
-						IP : '::1',
+						IP : '::',
 						Boom : WW.Now()
 					})
 					T.S = 9
