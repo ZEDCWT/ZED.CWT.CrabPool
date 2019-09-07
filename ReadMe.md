@@ -29,8 +29,8 @@ const CrabPool = require('crabpool')
 
 CrabPool(
 {
-	Cipher : <A cipher, will be described in section API>,
-	Deipher : <A decipher, will be described in section API>,
+	Cipher : () => <A cipher, will be described in section API>,
+	Deipher : () => <A decipher, will be described in section API>,
 	PortMaster : 2412 // Port to deploy the master
 })
 ```
@@ -42,8 +42,8 @@ const Net = require('net')
 
 CrabPool(
 {
-	Cipher : <The same cipher used by the master>,
-	Deipher : <The same decipher used by the master>,
+	Cipher : () => <The same cipher used by the master>,
+	Deipher : () => <The same decipher used by the master>,
 	Pipe : () => Net.createConnection(2412,'IP to the master')
 })
 ```
@@ -61,8 +61,8 @@ CrabPool(
 	PortWeb : 4000
 })
 ```
-Then a local web server `localhost:4000` will be deploy and can be visited from browsers (that supports WebSocket). The initial manage token can be found in the log, whice will be described in section [API], prefixed with `Key`.
-You can also use it as an Express.Router and mount it to any path you like on an existing server, which will also be described in the [API] section.
+Then a local web server `localhost:4000` will be deploy and can be visited from browsers (that support WebSocket). The initial manage token can be found in the log, whice will be described in section [API], prefixed with `Key`.
+You can also use it as an `Express.Router` and mount it to any path you like on an existing server, which will also be described in the [API] section.
 
 
 
@@ -163,7 +163,7 @@ CrabPool(
 			.then(O =>
 			{
 				Log('Resolved',O)
-				Net.createConnection(Addr = O)
+				return Net.createConnection(Addr = O)
 			})
 	})
 })

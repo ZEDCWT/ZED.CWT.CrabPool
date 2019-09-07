@@ -586,7 +586,6 @@ module.exports = Option =>
 		DataLinkS.S()
 		WebSocketSend([ActionWebLinkS,DataLinkS.O()])
 	},
-	LogWeb,
 	WebServerMap =
 	{
 		'/' : WN.JoinP(PathWeb,'Entry'),
@@ -605,8 +604,8 @@ module.exports = Option =>
 				S.writeHead(404)
 				S.end(`Unable to resolve //${Q.headers.host || ''}${Q.url}`)
 			})
-	}).on('listening',() => LogWeb('Deployed at',WebServer.address().port)),
-	LogWebSocket,
+	}).on('listening',() => MakeLog('Web')('Deployed at',WebServer.address().port)),
+	WebSocketCount = Counter(),
 	WebSocketPool = new Set,
 	WebSocketLast = {[ActionWebPool] : [ActionWebPool,DataPool.O()]},
 	WebSocketSend = (Q,S) =>
@@ -618,8 +617,8 @@ module.exports = Option =>
 	OnSocket = (S,H) =>
 	{
 		var
+		Log = MakeLog(`WebSocket ${WebSocketCount()} ${RemoteIP(H.connection)}`),
 		Timer = MakeTime(),
-		Addr = RemoteIP(H.connection),
 		Cipher = WC.AESES(WebToken,WebToken,WC.CFB),
 		Decipher = WC.AESDS(WebToken,WebToken,WC.CFB),
 		Send = D =>
@@ -638,7 +637,7 @@ module.exports = Option =>
 			!WW.IsSafe(Q[3] = +Q[3]) || Q[3] < 0 || 65535 < Q[3] ? Err(H,'Port should be a number in range [0,65535]') :
 			true;
 
-		LogWebSocket('Accepted',Addr)
+		Log('Accepted')
 		S.on('message',(Q,T) =>
 		{
 			Wait.D()
@@ -760,7 +759,7 @@ module.exports = Option =>
 			}
 		}).on('close',E =>
 		{
-			LogWebSocket('Closed',Timer(),E,Addr)
+			Log('Closed',Timer(),E)
 			WebSocketPool.delete(Send)
 			Wait.F()
 		})
@@ -769,8 +768,6 @@ module.exports = Option =>
 
 	if (null == Log) Log = (H => (...Q) => H(WW.StrDate(),WW.Tick(),'|',...Q))
 		(WN.RollLog({Pre : WN.JoinP(PathLog,'Event')}))
-	LogWeb = MakeLog('Web')
-	LogWebSocket = MakeLog('WebSocket')
 	WR.Each(V => V.S = 0,DataPool.O())
 
 	return {

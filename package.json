@@ -1,5 +1,5 @@
 {
-	"name" : "@zed.cwt/crabpool",
+	"name" : "crabpool",
 	"version" : "0.0.0",
 	"description" : "Yet Another Private Network Solution",
 	"main" : "CrabPool",
