@@ -59,7 +59,7 @@ module.exports = Option =>
 	DataLinkS = WN.JSON(WN.JoinP(PathData,'LinkS')),
 
 	MachineIDRaw,MachineID,
-	IDSolve = Q => WC.HEXS(WC.SHA512(Q[1])),
+	IDSolve = Q => WC.HEXS(WC.SHA512(Q)),
 	IDShort = Q => Q.slice(0,8),
 	IDName = Q => Q.slice(0,8) + (Q = DataPool.D(Q),Q && Q.Name ? ':' + Q.Name : ''),
 	Token = WC.Rad(WW.D + WW.AZ + WW.az).S,
@@ -175,6 +175,7 @@ module.exports = Option =>
 			{
 				DataPing[MID] = Q
 				PoolO([ActionPing,MID,Q])
+				WebSocketSend([ActionWebPing,MID,Q])
 			}),
 			Sec = MakeSec(S,Q =>
 			{
@@ -204,6 +205,7 @@ module.exports = Option =>
 						PoolNotify()
 						Log('Node')
 						Sec.O([ActionPing,DataPing])
+						WebSocketSend([ActionWebPing,DataPing])
 						Ping.R()
 						break
 					case ActionPing :
@@ -569,6 +571,7 @@ module.exports = Option =>
 			}
 		};
 		State.Port = -1
+		State.Using = 0
 		LinkSNotify()
 		return PoolWish[ID] = O
 	},
@@ -588,7 +591,7 @@ module.exports = Option =>
 	},
 	WebServerMap =
 	{
-		'/' : WN.JoinP(PathWeb,'Entry'),
+		'/' : WN.JoinP(PathWeb,'Entry.htm'),
 		'/W' : require.resolve('@zed.cwt/wish'),
 		'/M' : WN.JoinP(PathWeb,'Entry.js')
 	},

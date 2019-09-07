@@ -302,6 +302,7 @@
 						Name.V(Q.Name)
 						Desc.V(Q.Desc)
 						Q.S ? Del.Off() : Del.On()
+						;(Q.S ? WV.ClsA : WV.ClsR)(Del.R,WV.None)
 						return R
 					},
 					P : function(Q)
@@ -311,6 +312,7 @@
 					},
 					D : function(){return WV.Del(U),R}
 				};
+				WV.ClsA(Del.R,WV.None)
 				WV.Ap(WV.ApR([Index,State,Name,Desc,Last,Del],U),V)
 				return R
 			},
