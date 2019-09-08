@@ -98,7 +98,7 @@
 					{
 						Q = Q[1]
 						S = S[1]
-						return S.MEZ - Q.MEZ ||
+						return (S.MEZ || 0) - (Q.MEZ || 0) ||
 							(Q.Name < S.Name ? -1 : S.Name < Q.Name) ||
 							(Q.Desc < S.Desc ? -1 : S.Desc < Q.Desc) ||
 							Q.Boom - S.Boom
@@ -150,9 +150,11 @@
 	PoolIndex = {},
 
 	Rainbow = WV.Div(2,['10%'],true),
-	RTab = WV.Split({Pan : Rainbow});
+	RTab = WV.Split({Pan : Rainbow}),
+	RTopState = WV.Fmt('Online `O` / `N`\nLink `L` / `I`','-');
 
 	WV.CSS(Rainbow[1],'min-width',100)
+	WV.Ap(RTopState.R,RTab.B)
 
 	RTab.Add(
 	[
@@ -216,12 +218,16 @@
 					return WW.Fmt
 					(
 						'body{height:100%}' +
+						'.`T`>.`M`{text-align:center;margin:6px 0}' +
+
 						'#`R`{padding:40px;text-align:center}' +
 						'#`R`>div{margin:auto;padding:20px;max-width:26em}' +
 						'#`R` .`I`{margin:20px 0}',
 						{
 							R : ID,
-							I : WV.InpW
+							I : WV.InpW,
+							T : WV.TabT,
+							M : WV.FmtW
 						}
 					)
 				},
@@ -252,7 +258,7 @@
 				},
 				Name = MakeEdit({Hint : 'Unnamed'},'Name'),
 				Desc = MakeEdit({Type : WV.InpPX,Hint : 'No Description'},'Desc'),
-				Last = WV.Fmt('Created at `O`. Total : `L`. Last on `F` => `T`',{O : '-',L : '-',F : '-',T : '-'}),
+				Last = WV.Fmt('Created at `O`. Total : `L`. Last on `F` => `T`','-'),
 				Del = WV.But(
 				{
 					X : 'Remove',
@@ -335,12 +341,14 @@
 			OnMEZ = function(Q){CardMEZ.L(Q)}
 			OnPoolPool = function()
 			{
+				var Count = 0
 				PoolIndex = {}
 				WR.EachU(function(/**@type {CrabPoolNS.Pool}*/V,I,F)
 				{
 					PoolIndex[V[0]] = I
 					F = V[0]
 					V = V[1]
+					Count += !!V.S
 					if (V.MEZ) CardQBH[F] = V = CardMEZ.H(F).O(V)
 					else if (WR.Has(F,CardQBH)) V = CardQBH[F].O(V)
 					else
@@ -351,6 +359,7 @@
 					V.I(WR.PadU(I,DataPoolList.length),DataPoolList.length)
 				},DataPoolList)
 				WR.EachU(function(V,F){WR.Has(F,DataPoolMap) || V.D()},CardQBH)
+				RTopState.O(Count).N(DataPoolList.length)
 			}
 			OnPing = function(Q,S)
 			{
@@ -433,7 +442,7 @@
 				Host = MakeHost().S(HostSel),
 				Addr = MakeAddr(),
 				Deploy = MakeDeploy(),
-				State = WV.Fmt('[`S`] Created at `C`. Visited : `V`. Using : `U`. Last on `L``E`',{S : '-',C : '-',V : '-',U : '-',L : '-'}),
+				State = WV.Fmt('[`S`] Created at `C`. Visited : `V`. Using : `U`. Last on `L``E`','-'),
 				Save = WV.But(
 				{
 					X : 'Save Changes',
@@ -528,10 +537,12 @@
 			}
 			OnLink = function(Q,S)
 			{
+				var Count = 0
 				WR.EachU(function(V,I,F)
 				{
 					F = V[0]
 					V = V[1]
+					Count += !!V.S
 					;(CardPool[F] || (CardPool[F] = MakeCard().H(F)))
 						.I(WR.PadU(S.length + ~I,S.length),S.length)
 						.O(V)
@@ -544,6 +555,7 @@
 						(S.Addr < Q.Addr ? -1 : Q.Addr < S.Addr)
 				}))
 				WR.EachU(function(V,F){WR.Has(F,Q) || V.D()},CardPool)
+				RTopState.L(Count).I(S.length)
 			}
 			OnLinkS = function(Q)
 			{
