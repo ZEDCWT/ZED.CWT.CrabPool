@@ -168,7 +168,7 @@
 				else
 				{
 					MakeWebSocket(Token.V())
-					Token.V('')
+					Token.V('').Foc()
 				}
 			},
 			Token = WV.Inp(
@@ -182,7 +182,7 @@
 				if (WebSocketSend([ActionWebToken,WC.B91S(TokenStepA(Token.V())),WC.B91S(TokenStepA(TokenNew.V()))]))
 				{
 					Token.V('')
-					TokenNew.V('')
+					TokenNew.V('').Foc()
 					NotiNewToken('Saving new token')
 				}
 			},
@@ -271,7 +271,7 @@
 							[
 								'Sure to remove this machine?',
 								IDShort(ID) + (O.Name ? ':' + O.Name : ''),
-								V.Desc || ''
+								O.Desc || ''
 							].join('\n'),function(){WebSocketSend([ActionWebPoolDel,ID])})
 						}
 					}
@@ -428,7 +428,7 @@
 				return R
 			},
 			MakeAddr = function(){return WV.Inp({Hint : 'IP/Domain With Port'})},
-			MakeDeploy = function(){return WV.Inp({Hint : 'Local Deploy Port',Yep : WV.InpYZ,Map : function(Q){return WR.Trim(Q) && +Q}})},
+			MakeDeploy = function(Q){return WV.Inp({Hint : 'Local Deploy Port',Yep : WV.InpYZ,Ent : Q,Map : function(Q){return WR.Trim(Q) && +Q}})},
 			MakeCard = function()
 			{
 				var
@@ -442,7 +442,7 @@
 				Host = MakeHost().S(HostSel),
 				Addr = MakeAddr(),
 				Deploy = MakeDeploy(),
-				State = WV.Fmt('[`S`] Created at `C`. Visited : `V`. Using : `U`. Last on `L``E`','-'),
+				State = WV.Fmt('[`S`] Created at `C`. Visited : `V`. Using : `U`. Last on `L``E`','-').E(''),
 				Save = WV.But(
 				{
 					X : 'Save Changes',
@@ -507,7 +507,6 @@
 			SaveCard = WV.Rock(ClassCard + ' ' + WV.S4),
 			SaveHost = MakeHost().S(HostSel),
 			SaveAddr = MakeAddr(),
-			SaveDeploy = MakeDeploy(),
 			SaveSave = WV.But(
 			{
 				X : 'Add New Link',
@@ -516,10 +515,11 @@
 				{
 					if (WebSocketSend([ActionWebLinkAdd,SaveHost.V(),SaveAddr.V(),SaveDeploy.V()]))
 					{
-						SaveDeploy.V('')
+						SaveDeploy.V('').Foc()
 					}
 				}
-			});
+			}),
+			SaveDeploy = MakeDeploy(SaveSave.C);
 			OnPoolLink = function()
 			{
 				HostMap = {}
