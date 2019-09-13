@@ -92,7 +92,7 @@ You can also use it as an `Express.Router` and mount it to any path you like on 
 
 ## Misc
 
-## Data Folder Structure
+### Data Folder Structure
 ```sh
 ZED/CrabPool
 +-- ID # Unique machine ID, randomly generated on the first run.
