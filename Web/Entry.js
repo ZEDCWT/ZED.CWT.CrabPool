@@ -168,7 +168,7 @@
 				else
 				{
 					MakeWebSocket(Token.V())
-					Token.V('').Foc()
+					Token.V('').Fresh().Foc()
 				}
 			},
 			Token = WV.Inp(
@@ -181,8 +181,8 @@
 			{
 				if (WebSocketSend([ActionWebToken,WC.B91S(TokenStepA(Token.V())),WC.B91S(TokenStepA(TokenNew.V()))]))
 				{
-					Token.V('')
-					TokenNew.V('').Foc()
+					Token.V('').Fresh()
+					TokenNew.V('').Fresh().Foc()
 					NotiNewToken('Saving new token')
 				}
 			},
@@ -231,7 +231,7 @@
 						}
 					)
 				},
-				Hide : function(){Token.V(''),TokenNew.V('')}
+				Hide : function(){Token.V('').Fresh(),TokenNew.V('').Fresh()}
 			}
 		}],
 		['Pool',function(V)
