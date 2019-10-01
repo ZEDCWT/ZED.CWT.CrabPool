@@ -49,7 +49,7 @@ CrabPool(
 ```
 
 ### Custom the Links
-To access resources of other Nodes, one need to configure links. Simply install the optional dependence `ws` by `npm i ws`, and add `PortWeb` property to the setup object like this:
+To access the resources of other Nodes, one needs to configure links. Simply install the optional dependence `ws` by `npm i ws`, and add `PortWeb` property to the setup object like this:
 ```js
 const CrabPool = require('crabpool')
 
@@ -61,7 +61,7 @@ CrabPool(
 	PortWeb : 4000
 })
 ```
-Then a local web server `localhost:4000` will be deploy and can be visited from browsers (that support WebSocket). The initial manage token can be found in the log, whice will be described in section [API], prefixed with `Key`.
+Then a local web server `localhost:4000` will be deployed and can be visited from browsers (that support WebSocket). The initial manage token can be found in the log, which will be described in section [API], prefixed with `Key`.
 You can also use it as an `Express.Router` and mount it to any path you like on an existing server, which will also be described in the [API] section.
 
 
