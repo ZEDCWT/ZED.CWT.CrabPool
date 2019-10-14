@@ -24,6 +24,8 @@
 	ActionWebLinkEdit = 'LinkEdit',
 	ActionWebLinkDel = 'LinkDel',
 	ActionWebLinkError = 'LinkError',
+	ActionWebExt = 'Ext',
+	ActionWebExtClip = 'ExtClip',
 	ActionWebError = 'Err',
 
 	ClassCard = WW.Key(),
@@ -121,6 +123,10 @@
 					OnLinkError(Q[1],Q[2])
 					break
 
+				case ActionWebExt :
+					Ext.Emit(Q[1],Q[2])
+					break
+
 				case ActionWebError :
 					Noti.S(['Error | ',Q[1],' | ',Q[2]])
 					break
@@ -147,6 +153,7 @@
 	DataPoolMap = {},DataPoolList = [],
 	OnConnect,OnMEZ,OnPoolPool,OnPing,
 	OnPoolLink,OnLink,OnLinkS,OnLinkError,
+	Ext = WW.Bus(),
 	PoolIndex = {},
 
 	Rainbow = WV.Div(2,['10%'],true),
@@ -582,6 +589,42 @@
 						{
 							R : ID,
 							D : ClassDesc
+						}
+					)
+				}
+			}
+		}],
+		['Ext',function(V)
+		{
+			var
+			ClassTitle = WW.Key(),
+
+			ClipTitle = WV.Text(WV.Rock(ClassTitle),'In-memory Clipboard'),
+			ClipContent = WV.Inp(
+			{
+				Type : WV.InpPX,
+				The : WV.TheS,
+				Stat : true,
+				Row : 5,
+				Inp : function(){ClipContent.Stat(undefined,ClipContent.V().length)},
+				Out : function(){WebSocketSend([ActionWebExt,ActionWebExtClip,ClipContent.V()])}
+			}).Stat('',0);
+
+			Ext.On(ActionWebExtClip,ClipContent.V)
+			WV.ApR([ClipTitle,ClipContent],V)
+
+			return {
+				CSS : function(ID)
+				{
+					return WW.Fmt
+					(
+						'#`R`{text-align:center}' +
+						'.`T`{margin:16px}' +
+						'#`R` .`I`{padding:0 16px}',
+						{
+							R : ID,
+							I : WV.InpW,
+							T : ClassTitle
 						}
 					)
 				}

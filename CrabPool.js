@@ -16,6 +16,8 @@ ActionPool = 'Pool',
 ActionPoolEdit = 'PoolEdit',
 ActionPoolDel = 'PoolDel',
 ActionTick = 'Tick',
+ActionExt = 'Ext',
+ActionExtClip = 'ExtClip',
 ActionError = 'Err',
 
 ActionWebHello = 'Hell',
@@ -32,6 +34,8 @@ ActionWebLinkSwitch = 'LinkSwitch',
 ActionWebLinkEdit = 'LinkEdit',
 ActionWebLinkDel = 'LinkDel',
 ActionWebLinkError = 'LinkError',
+ActionWebExt = 'Ext',
+ActionWebExtClip = 'ExtClip',
 ActionWebError = 'Err';
 
 module.exports = Option =>
@@ -142,6 +146,8 @@ module.exports = Option =>
 		}
 	},
 
+	ExtDataClip = '',
+
 	//	Master
 	PoolKeySID = WW.Key(),
 	PoolKeyPipe = WW.Key(),
@@ -205,6 +211,7 @@ module.exports = Option =>
 						PoolNotify()
 						Log('Node')
 						Sec.O([ActionPing,DataPing])
+						Sec.O([ActionExt,ActionExtClip,ExtDataClip])
 						WebSocketSend([ActionWebPing,DataPing])
 						Ping.R()
 						break
@@ -244,6 +251,15 @@ module.exports = Option =>
 						break
 
 					case ActionTick : break
+
+					case ActionExt :
+						switch (Q[1])
+						{
+							case ActionExtClip :
+								MEZExtClip(Q[2])
+								break
+						}
+						break
 
 					case ActionError :
 					default : S.destroy()
@@ -313,6 +329,11 @@ module.exports = Option =>
 		DataPool.D(Q[1],null)
 		PoolNotify()
 	},
+	MEZExtClip = Q =>
+	{
+		OnExtClip(ExtDataClip = Q)
+		PoolO([ActionExt,ActionExtClip,Q])
+	},
 
 	//	Node
 	Online,
@@ -366,6 +387,15 @@ module.exports = Option =>
 						break
 
 					case ActionTick : break
+
+					case ActionExt :
+						switch (Q[1])
+						{
+							case ActionExtClip :
+								OnExtClip(Q[2])
+								break
+						}
+						break
 
 					case ActionError : Log(...Q)
 					default : M.destroy()
@@ -617,6 +647,7 @@ module.exports = Option =>
 		WebSocketPool.forEach(V => V(Q))
 	},
 	OnPool = Q => WebSocketSend([ActionWebPool,Q]),
+	OnExtClip = Q => WebSocketSend([ActionWebExt,ActionWebExtClip,Q]),
 	OnSocket = (S,H) =>
 	{
 		var
@@ -631,18 +662,20 @@ module.exports = Option =>
 		},
 		Err = (Q,S) => Send([ActionWebError,Q,S]),
 		Suicide = () => S.terminate(),
-		Wait = WW.To(Timeout,Suicide),
-
-		CheckLink = (H,Q) =>
-			!Q[1] ? Err(H,'Host is required') :
-			!DataPool.D(Q[1]) ? Err(H,'Invalid host') :
-			!Q[2] ? Err(H,'Address is required') :
-			!WW.IsSafe(Q[3] = +Q[3]) || Q[3] < 0 || 65535 < Q[3] ? Err(H,'Port should be a number in range [0,65535]') :
-			true;
+		Wait = WW.To(Timeout,Suicide);
 
 		Log('Accepted')
 		S.on('message',(Q,T) =>
 		{
+			var
+			CheckOnline = () => Online || Err(Q[0],'Master is not connected'),
+			CheckLink = S =>
+				!S[1] ? Err(Q[0],'Host is required') :
+				!DataPool.D(S[1]) ? Err(Q[0],'Invalid host') :
+				!S[2] ? Err(Q[0],'Address is required') :
+				!WW.IsSafe(S[3] = +S[3]) || S[3] < 0 || 65535 < S[3] ? Err(Q[0],'Port should be a number in range [0,65535]') :
+				true;
+
 			Wait.D()
 			Q = Decipher.D(WC.B91P(Q))
 			Q = WC.JTOO(WC.U16S(Q))
@@ -674,21 +707,17 @@ module.exports = Option =>
 
 				case ActionWebPoolEdit :
 					PipeMaster ?
-						Online ?
-							Online.O([ActionPoolEdit,Q[1],Q[2],Q[3]]) :
-							Err(ActionWebPoolEdit,'Master is not connected') :
+						CheckOnline() && Online.O([ActionPoolEdit,Q[1],Q[2],Q[3]]) :
 						MEZPoolEdit(Q)
 					break
 				case ActionWebPoolDel :
 					PipeMaster ?
-						Online ?
-							Online.O([ActionPoolDel,Q[1]]) :
-							Err(ActionWebPoolDel,'Master is not connected') :
+						CheckOnline() && Online.O([ActionPoolDel,Q[1]]) :
 						MEZPoolDel(Q)
 					break
 
 				case ActionWebLinkAdd :
-					if (CheckLink(ActionWebLinkAdd,Q))
+					if (CheckLink(Q))
 					{
 						DataLink.D(T = WW.Key(32),
 						{
@@ -710,7 +739,7 @@ module.exports = Option =>
 					}
 					break
 				case ActionWebLinkEdit :
-					if (CheckLink(ActionWebLinkEdit,Q))
+					if (CheckLink(Q))
 					{
 						if (T = DataLink.D(Q[4]))
 						{
@@ -755,6 +784,17 @@ module.exports = Option =>
 						DataLink.D(Q[1],null)
 						DataLinkS.D(Q[1],null)
 						LinkNotify()
+					}
+					break
+
+				case ActionWebExt :
+					switch (Q[1])
+					{
+						case ActionWebExtClip :
+							PipeMaster ?
+								CheckOnline() && Online.O([ActionExt,ActionExtClip,Q[2]]) :
+								MEZExtClip(Q[2])
+							break
 					}
 					break
 
