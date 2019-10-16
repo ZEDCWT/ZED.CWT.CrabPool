@@ -5,6 +5,7 @@
 	WW = Wish,
 	WR = WW.R,
 	WC = WW.C,
+	WB = WW.B,
 	WV = WW.V,
 	Top = Wish.Top,
 	WebSocket = Top.WebSocket,
@@ -37,6 +38,7 @@
 	Noti = WV.Noti(),
 	NotiOnline = Noti.O(),
 	NotiNewToken = Noti.O(),
+	ShortCut = WB.SC(),
 
 	Online,Connecting,
 	WebSocketNotConnected = function(){Noti.S('Unable to perform when offline')},
@@ -636,6 +638,9 @@
 		}]*/
 	])
 	RTab.At(0)
+
+	ShortCut.On('[',RTab.Prev)
+		.On(']',RTab.Next)
 
 	WV.Ready(function()
 	{
