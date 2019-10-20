@@ -1,6 +1,6 @@
 {
 	"name" : "crabpool",
-	"version" : "0.0.2",
+	"version" : "0.1.0",
 	"description" : "Yet Another Private Network Solution",
 	"main" : "CrabPool",
 	"repository" :
