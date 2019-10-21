@@ -159,7 +159,7 @@
 	PoolIndex = {},
 
 	Rainbow = WV.Div(2,['10%'],true),
-	RTab = WV.Split({Pan : Rainbow}),
+	RTab = WV.Split({Pan : Rainbow,Main : true}),
 	RTopState = WV.Fmt('Online `O` / `N`\nLink `L` / `I`','-');
 
 	WV.CSS(Rainbow[1],'min-width',100)
@@ -637,7 +637,6 @@
 
 		}]*/
 	])
-	RTab.At(0)
 
 	ShortCut.On('[',RTab.Prev)
 		.On(']',RTab.Next)
@@ -645,5 +644,6 @@
 	WV.Ready(function()
 	{
 		WV.ApA([Rainbow[0],Noti.R],WV.Body)
+		RTab.At(0)
 	})
 }()
