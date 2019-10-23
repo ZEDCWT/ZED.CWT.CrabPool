@@ -405,7 +405,7 @@
 			HostMap = {},
 			HostMapInv = {},
 			HostPool = WW.Set(),
-			MakeHostFilter = function(S,_,Q){return Q.test(S[0]) || Q.test(S[2])},
+			MakeHostFilter = function(S,_,Q){return Q.test(S[0]) || Q.test(S[3])},
 			MakeHost = function()
 			{
 				var
@@ -540,7 +540,7 @@
 					P = IDShort(F) + (V.Name ? ':' + V.Name : '')
 					HostMap[P] = F
 					HostMapInv[F] = P
-					return [P,[P,V.Desc ? function(){return WV.Text(WV.Rock(ClassDesc),V.Desc)} : ''],V.Desc]
+					return [P,[P,V.Desc ? function(){return WV.Text(WV.Rock(ClassDesc),V.Desc)} : ''],P,V.Desc]
 				},DataPoolList)
 				WR.Each(function(V){V.S(HostSel)},HostPool)
 			}
