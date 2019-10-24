@@ -40,6 +40,11 @@
 	NotiNewToken = Noti.O(),
 	ShortCut = WB.SC(),
 
+	StoreKey = '[CrabPool]~',
+	StoreKeyClipHeight = 'ClipHeight',
+	StoreGet = function(Q){return WB.StoG(StoreKey + Q)},
+	StoreSet = function(Q,S){return WB.StoS(StoreKey + Q,S)},
+
 	Online,Connecting,
 	WebSocketNotConnected = function(){Noti.S('Unable to perform when offline')},
 	WebSocketSend = WebSocketNotConnected,
@@ -608,11 +613,16 @@
 				The : WV.TheS,
 				Stat : true,
 				Row : 5,
-				Inp : function(){ClipContent.Stat(undefined,ClipContent.V().length)},
-				Out : function(){WebSocketSend([ActionWebExt,ActionWebExtClip,ClipContent.V()])}
-			}).Stat('',0);
+				Inp : function(V){ClipContent.Stat(undefined,V.length)},
+				InpU : function(V){WebSocketSend([ActionWebExt,ActionWebExtClip,V])}
+			}).Stat('',0),
+			ClipTimeout = WW.To(5E3,function()
+			{
+				StoreSet(StoreKeyClipHeight,WV.CS(ClipContent.I,'height'))
+			},true).F();
 
 			Ext.On(ActionWebExtClip,ClipContent.V)
+			WV.CSS(ClipContent.I,'height',StoreGet(StoreKeyClipHeight) || '')
 			WV.ApR([ClipTitle,ClipContent],V)
 
 			return {
@@ -629,6 +639,14 @@
 							T : ClassTitle
 						}
 					)
+				},
+				Show : function()
+				{
+					ClipTimeout.D()
+				},
+				HideP : function()
+				{
+					ClipTimeout.F().C()
 				}
 			}
 		}]/*,
