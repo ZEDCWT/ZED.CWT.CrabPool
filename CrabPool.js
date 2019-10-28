@@ -61,6 +61,7 @@ module.exports = Option =>
 	DataPool = WN.JSON(WN.JoinP(PathData,'Pool')),
 	DataLink = WN.JSON(WN.JoinP(PathData,'Link')),
 	DataLinkS = WN.JSON(WN.JoinP(PathData,'LinkS')),
+	DataExtClip = WN.JSON(WN.JoinP(PathData,ActionWebExtClip),[]),
 
 	MachineIDRaw,MachineID,
 	IDSolve = Q => WC.HEXS(WC.SHA512(Q)),
@@ -146,8 +147,6 @@ module.exports = Option =>
 		}
 	},
 
-	ExtDataClip = '',
-
 	//	Master
 	PoolKeySID = WW.Key(),
 	PoolKeyPipe = WW.Key(),
@@ -211,7 +210,7 @@ module.exports = Option =>
 						PoolNotify()
 						Log('Node')
 						Sec.O([ActionPing,DataPing])
-						Sec.O([ActionExt,ActionExtClip,ExtDataClip])
+						Sec.O([ActionExt,ActionExtClip,DataExtClip.D(0)])
 						WebSocketSend([ActionWebPing,DataPing])
 						Ping.R()
 						break
@@ -331,7 +330,7 @@ module.exports = Option =>
 	},
 	MEZExtClip = Q =>
 	{
-		OnExtClip(ExtDataClip = Q)
+		OnExtClip(DataExtClip.D(0,Q))
 		PoolO([ActionExt,ActionExtClip,Q])
 	},
 
@@ -647,7 +646,7 @@ module.exports = Option =>
 		WebSocketPool.forEach(V => V(Q))
 	},
 	OnPool = Q => WebSocketSend([ActionWebPool,Q]),
-	OnExtClip = Q => WebSocketSend([ActionWebExt,ActionWebExtClip,Q]),
+	OnExtClip = Q => WebSocketSend([ActionWebExt,ActionWebExtClip,DataExtClip.D(0,Q)]),
 	OnSocket = (S,H) =>
 	{
 		var
@@ -848,6 +847,7 @@ module.exports = Option =>
 				}
 				PoolNotify()
 				LinkNotify()
+				WebSocketSend([ActionWebExt,ActionWebExtClip,DataExtClip.D(0) || DataExtClip.D(0,'')])
 				Log('========')
 				WW.IsNum(PortWeb) && new (require('ws')).Server({server : WebServer.listen(PortWeb)}).on('connection',OnSocket)
 				WR.EachU((V,F) =>

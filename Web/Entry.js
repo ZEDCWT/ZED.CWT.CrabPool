@@ -606,7 +606,7 @@
 			var
 			ClassTitle = WW.Key(),
 
-			ClipTitle = WV.Text(WV.Rock(ClassTitle),'In-memory Clipboard'),
+			ClipTitle = WV.Text(WV.Rock(ClassTitle),'Clipboard'),
 			ClipContent = WV.Inp(
 			{
 				Type : WV.InpPX,
