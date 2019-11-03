@@ -60,6 +60,7 @@
 		Cipher,Decipher;
 		Client.onmessage = function(Q)
 		{
+			var K,O;
 			if (!Cipher)
 			{
 				MachineID = Q.data
@@ -82,30 +83,30 @@
 			}
 			Q = Decipher.D(WC.B91P(Q.data))
 			Q = WC.JTOO(WC.U16S(Q))
-			if (!WW.IsArr(Q)) return Suicide()
-			Q = Q[1]
-			if (!WW.IsArr(Q)) return Suicide()
+			if (!WW.IsArr(Q) || !WW.IsArr(Q = Q[1])) return Suicide()
+			K = Q[1]
+			O = Q[2]
 			switch (Q[0])
 			{
 				case ActionWebHello :
 					Online = Shaked = true
 					NotiOnline('Connected')
 					NotiOnline(false)
-					MachineID = Q[1]
-					OnConnect(Q[2])
+					MachineID = K
+					OnConnect(O)
 					break
 				case ActionWebMEZ :
-					OnMEZ(Q[1])
+					OnMEZ(K)
 					break
 				case ActionWebToken :
-					NotiNewToken(Q[1])
+					NotiNewToken(K)
 					NotiNewToken(false)
 					break
 
 				case ActionWebPool :
-					DataPoolList = WR.ToPair(DataPoolMap = Q[1]).sort(function(Q,S)
+					DataPoolList = WR.ToPair(DataPoolMap = K).sort(function(Q,S)
 					{
-						Q = Q[1]
+						Q = K
 						S = S[1]
 						return (S.MEZ || 0) - (Q.MEZ || 0) ||
 							(Q.Name < S.Name ? -1 : S.Name < Q.Name) ||
@@ -117,25 +118,25 @@
 					break
 
 				case ActionWebPing :
-					OnPing(Q[1],Q[2])
+					OnPing(K,O)
 					break
 
 				case ActionWebLink :
-					OnLink(Q[1])
+					OnLink(K)
 					break
 				case ActionWebLinkS :
-					OnLinkS(Q[1])
+					OnLinkS(K)
 					break
 				case ActionWebLinkError :
-					OnLinkError(Q[1],Q[2])
+					OnLinkError(K,O)
 					break
 
 				case ActionWebExt :
-					Ext.Emit(Q[1],Q[2])
+					Ext.Emit(K,O)
 					break
 
 				case ActionWebError :
-					Noti.S(['Error | ',Q[1],' | ',Q[2]])
+					Noti.S(['Error | ',K,' | ',O])
 					break
 
 				default : Suicide()
@@ -609,10 +610,9 @@
 			ClipTitle = WV.Text(WV.Rock(ClassTitle),'Clipboard'),
 			ClipContent = WV.Inp(
 			{
-				Type : WV.InpPX,
 				The : WV.TheS,
 				Stat : true,
-				Row : 5,
+				Row : 8,
 				Inp : function(V){ClipContent.Stat(undefined,V.length)},
 				InpU : function(V){WebSocketSend([ActionWebExt,ActionWebExtClip,V])}
 			}).Stat('',0),

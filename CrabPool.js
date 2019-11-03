@@ -184,15 +184,16 @@ module.exports = Option =>
 			}),
 			Sec = MakeSec(S,Q =>
 			{
+				var K = Q[1],E = Q[2];
 				switch (Q[0])
 				{
 					case ActionHello :
-						if (!Q[1]) return Err('Who are you')
-						MID = IDSolve(Q[1])
-						if (MID === MachineID) return Err('You are not only')
+						if (!K) return Err('Who are you')
+						MID = IDSolve(K)
+						if (MID === MachineID) return Err('You are not unique')
 						WR.Has(MID,Pool) &&
 						(
-							Pool[MID][PoolKeySec].O([ActionError,'You are not only']),
+							Pool[MID][PoolKeySec].O([ActionError,'You are not unique']),
 							Pool[MID][PoolKeyPipe].destroy()
 						)
 						Pool[MID] = O
@@ -215,27 +216,27 @@ module.exports = Option =>
 						Ping.R()
 						break
 					case ActionPing :
-						Sec.O([ActionPong,Q[1]])
+						Sec.O([ActionPong,K])
 						break
 					case ActionPong :
-						Ping.O(Q[1])
+						Ping.O(K)
 						break
 
 					case ActionWish :
-						if (!WR.Has(MID = IDSolve(Q[1]),Pool)) return Err('Who are you')
-						if (Q[2] === MachineID) MakeMEZTake(O,MID,Q[3],Q[4])
+						if (!WR.Has(MID = IDSolve(K),Pool)) return Err('Who are you')
+						if (E === MachineID) MakeMEZTake(O,MID,Q[3],Q[4])
 						else
 						{
-							if (!WR.Has(Q[2],Pool)) return Err('Who is that')
+							if (!WR.Has(E,Pool)) return Err('Who is that')
 							PoolPartner[SessionID] = O
-							Pool[Q[2]][PoolKeySec].O([ActionWish,SessionID,MID,Q[3],Q[4]])
+							Pool[E][PoolKeySec].O([ActionWish,SessionID,MID,Q[3],Q[4]])
 						}
 						Log('Wish')
 						return false
 					case ActionTake :
-						if (!WR.Has(MID = IDSolve(Q[1]),Pool)) return Err('Who are you')
-						if (!WR.Has(Q[2],PoolPartner)) return Err('Who is that')
-						Partner = PoolPartner[Q[2]]
+						if (!WR.Has(MID = IDSolve(K),Pool)) return Err('Who are you')
+						if (!WR.Has(E,PoolPartner)) return Err('Who is that')
+						Partner = PoolPartner[E]
 						Partner[PoolKeyOnPartner](O)
 						Sec.O([ActionWish])
 						Partner[PoolKeySec].O([ActionWish])
@@ -252,10 +253,10 @@ module.exports = Option =>
 					case ActionTick : break
 
 					case ActionExt :
-						switch (Q[1])
+						switch (K)
 						{
 							case ActionExtClip :
-								MEZExtClip(Q[2])
+								MEZExtClip(E)
 								break
 						}
 						break
@@ -356,29 +357,30 @@ module.exports = Option =>
 			}),
 			Sec = MakeSec(M,Q =>
 			{
+				var K = Q[1],E = Q[2];
 				switch (Q[0])
 				{
 					case ActionHello :
 						Log('Online')
-						MEZID = Q[1]
+						MEZID = K
 						WebSocketSend([ActionWebMEZ,RemoteIP(M)])
 						Online = Sec
 						Ping.R()
 						break
 					case ActionPing :
-						if (WW.IsObj(Q[1])) WebSocketSend([ActionWebPing,DataPing = Q[1]],true)
-						else if (WW.IsNum(Q[2]))
+						if (WW.IsObj(K)) WebSocketSend([ActionWebPing,DataPing = K],true)
+						else if (WW.IsNum(E))
 						{
-							DataPing[Q[1]] = Q[2]
-							WebSocketSend([ActionWebPing,Q[1],Q[2]],true)
+							DataPing[K] = E
+							WebSocketSend([ActionWebPing,K,E],true)
 						}
-						else Sec.O([ActionPong,Q[1]])
+						else Sec.O([ActionPong,K])
 						break
 					case ActionPong :
-						Ping.O(Q[1])
+						Ping.O(K)
 						break
 					case ActionPool :
-						OnPool(DataPool.O(Q[1]))
+						OnPool(DataPool.O(K))
 						break
 
 					case ActionWish :
@@ -388,10 +390,10 @@ module.exports = Option =>
 					case ActionTick : break
 
 					case ActionExt :
-						switch (Q[1])
+						switch (K)
 						{
 							case ActionExtClip :
-								OnExtClip(Q[2])
+								OnExtClip(E)
 								break
 						}
 						break
@@ -639,6 +641,7 @@ module.exports = Option =>
 	}).on('listening',() => MakeLog('Web')('Deployed at',WebServer.address().port)),
 	WebSocketCount = Counter(),
 	WebSocketPool = new Set,
+	WebSocketPoolSuicide = new Set,
 	WebSocketLast = {[ActionWebPool] : [ActionWebPool,DataPool.O()]},
 	WebSocketSend = (Q,S) =>
 	{
@@ -659,7 +662,6 @@ module.exports = Option =>
 			D = Cipher.D(WC.OTJ([WW.Key(WW.Rnd(20,40)),D,WW.Key(WW.Rnd(20,40))]))
 			try{S.send(WC.B91S(D))}catch(_){}
 		},
-		Err = (Q,S) => Send([ActionWebError,Q,S]),
 		Suicide = () => S.terminate(),
 		Wait = WW.To(Timeout,Suicide);
 
@@ -667,51 +669,54 @@ module.exports = Option =>
 		S.on('message',(Q,T) =>
 		{
 			var
-			CheckOnline = () => Online || Err(Q[0],'Master is not connected'),
+			Err = S => Send([ActionWebError,Q[0],S]),
+			K,O,
+			CheckOnline = () => Online || Err('Master is not connected'),
 			CheckLink = S =>
-				!S[1] ? Err(Q[0],'Host is required') :
-				!DataPool.D(S[1]) ? Err(Q[0],'Invalid host') :
-				!S[2] ? Err(Q[0],'Address is required') :
-				!WW.IsSafe(S[3] = +S[3]) || S[3] < 0 || 65535 < S[3] ? Err(Q[0],'Port should be a number in range [0,65535]') :
+				!S[1] ? Err('Host is required') :
+				!DataPool.D(S[1]) ? Err('Invalid host') :
+				!S[2] ? Err('Address is required') :
+				!WW.IsSafe(S[3] = +S[3]) || S[3] < 0 || 65535 < S[3] ? Err('Port should be a number in range [0,65535]') :
 				true;
 
 			Wait.D()
 			Q = Decipher.D(WC.B91P(Q))
 			Q = WC.JTOO(WC.U16S(Q))
-			if (!WW.IsArr(Q)) return Suicide()
-			Q = Q[1]
-			if (!WW.IsArr(Q)) return Suicide()
+			if (!WW.IsArr(Q) || !WW.IsArr(Q = Q[1])) return Suicide()
+			K = Q[1]
+			O = Q[2]
 			switch (Q[0])
 			{
 				case ActionWebHello :
-					if (WC.HEXS(TokenStepB(WC.B91P(Q[1]))) !== WC.HEXS(WebToken)) return Suicide()
+					if (WC.HEXS(TokenStepB(WC.B91P(K))) !== WC.HEXS(WebToken)) return Suicide()
 					Send([ActionWebHello,MachineID,!PipeMaster])
 					WR.Each(Send,WebSocketLast)
 					Send([ActionWebPing,DataPing])
 					WebSocketPool.add(Send)
+					WebSocketPoolSuicide.add(Suicide)
 					break
 
 				case ActionWebToken :
-					if (WC.HEXS(TokenStepB(WC.B91P(Q[1]))) === WC.HEXS(WebToken))
-						WN.FileW(FileToken,WC.B91S(TokenStepB(WC.B91P(Q[2]))))
+					if (WC.HEXS(TokenStepB(WC.B91P(K))) === WC.HEXS(WebToken))
+						WN.FileW(FileToken,WC.B91S(TokenStepB(WC.B91P(O))))
 							.FMap(() => WN.FileR(FileToken))
 							.Now(Q =>
 							{
 								WebToken = WC.B91P(Q)
 								Send([ActionWebToken,'New token saved! Connect again'])
-								Suicide()
-							},() => Err(ActionWebToken,'Failed to save the new token'))
-					else Err(ActionWebToken,'Original token is incorrect')
+								WebSocketPoolSuicide.forEach(V => V())
+							},() => Err('Failed to save the new token'))
+					else Err('Original token is incorrect')
 					break
 
 				case ActionWebPoolEdit :
 					PipeMaster ?
-						CheckOnline() && Online.O([ActionPoolEdit,Q[1],Q[2],Q[3]]) :
+						CheckOnline() && Online.O([ActionPoolEdit,K,O,Q[3]]) :
 						MEZPoolEdit(Q)
 					break
 				case ActionWebPoolDel :
 					PipeMaster ?
-						CheckOnline() && Online.O([ActionPoolDel,Q[1]]) :
+						CheckOnline() && Online.O([ActionPoolDel,K]) :
 						MEZPoolDel(Q)
 					break
 
@@ -722,8 +727,8 @@ module.exports = Option =>
 						{
 							S : 9,
 							Boom : WW.Now(),
-							Host : Q[1],
-							Addr : Q[2],
+							Host : K,
+							Addr : O,
 							Port : Q[3]
 						})
 						DataLinkS.D(T,
@@ -732,7 +737,7 @@ module.exports = Option =>
 							Using : 0,
 							Port : -9
 						})
-						MakeWish(T,Q[3])[PoolWishKeyUpdate](Q[1],Q[2])
+						MakeWish(T,Q[3])[PoolWishKeyUpdate](K,O)
 						LinkNotify()
 						LinkSNotify()
 					}
@@ -747,52 +752,52 @@ module.exports = Option =>
 								PoolWish[Q[4]][PoolWishKeyKill]()
 								MakeWish(Q[4],Q[3])
 							}
-							T.Host = Q[1]
-							T.Addr = Q[2]
+							T.Host = K
+							T.Addr = O
 							T.Port = Q[3]
 							T.S && PoolWish[Q[4]][PoolWishKeyUpdate](T.Host,T.Addr)
 							LinkNotify()
 						}
-						else Err(ActionWebLinkEdit,'Unable to edit nonexistent links')
+						else Err('Unable to edit nonexistent links')
 					}
 					break
 				case ActionWebLinkSwitch :
-					if ((T = DataLink.D(Q[1])) && !Q[2] !== !T.S)
+					if ((T = DataLink.D(K)) && !O !== !T.S)
 					{
-						if (T.S = Q[2] ? 9 : 0)
-							MakeWish(Q[1],T.Port)[PoolWishKeyUpdate](T.Host,T.Addr)
+						if (T.S = O ? 9 : 0)
+							MakeWish(K,T.Port)[PoolWishKeyUpdate](T.Host,T.Addr)
 						else
 						{
-							PoolWish[Q[1]][PoolWishKeyKill]()
-							WR.Del(Q[1],PoolWish)
-							DataLinkS.D(Q[1]).Port = -1
+							PoolWish[K][PoolWishKeyKill]()
+							WR.Del(K,PoolWish)
+							DataLinkS.D(K).Port = -1
 							LinkSNotify()
 						}
 						LinkNotify()
 					}
-					else Err(ActionWebLinkSwitch,'Invalid host')
+					else Err('Invalid host')
 					break
 				case ActionWebLinkDel :
-					if (T = DataLink.D(Q[1]))
+					if (T = DataLink.D(K))
 					{
 						if (T.S)
 						{
-							PoolWish[Q[1]][PoolWishKeyKill]()
-							WR.Del(Q[1],PoolWish)
+							PoolWish[K][PoolWishKeyKill]()
+							WR.Del(K,PoolWish)
 						}
-						DataLink.D(Q[1],null)
-						DataLinkS.D(Q[1],null)
+						DataLink.D(K,null)
+						DataLinkS.D(K,null)
 						LinkNotify()
 					}
 					break
 
 				case ActionWebExt :
-					switch (Q[1])
+					switch (K)
 					{
 						case ActionWebExtClip :
 							PipeMaster ?
-								CheckOnline() && Online.O([ActionExt,ActionExtClip,Q[2]]) :
-								MEZExtClip(Q[2])
+								CheckOnline() && Online.O([ActionExt,ActionExtClip,O]) :
+								MEZExtClip(O)
 							break
 					}
 					break
@@ -803,6 +808,7 @@ module.exports = Option =>
 		{
 			Log('Closed',Timer(),E)
 			WebSocketPool.delete(Send)
+			WebSocketPoolSuicide.delete(Suicide)
 			Wait.F()
 		})
 		try{S.send(MachineID)}catch(_){}
