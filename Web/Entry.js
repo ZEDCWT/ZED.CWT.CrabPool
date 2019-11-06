@@ -106,7 +106,7 @@
 				case ActionWebPool :
 					DataPoolList = WR.ToPair(DataPoolMap = K).sort(function(Q,S)
 					{
-						Q = K
+						Q = Q[1]
 						S = S[1]
 						return (S.MEZ || 0) - (Q.MEZ || 0) ||
 							(Q.Name < S.Name ? -1 : S.Name < Q.Name) ||
@@ -608,20 +608,33 @@
 			ClassTitle = WW.Key(),
 
 			ClipTitle = WV.Text(WV.Rock(ClassTitle),'Clipboard'),
+			ClipSaving,
 			ClipContent = WV.Inp(
 			{
 				The : WV.TheS,
 				Stat : true,
 				Row : 8,
 				Inp : function(V){ClipContent.Stat(undefined,V.length)},
-				InpU : function(V){WebSocketSend([ActionWebExt,ActionWebExtClip,V])}
+				InpU : function(V)
+				{
+					if (WebSocketSend([ActionWebExt,ActionWebExtClip,V]))
+					{
+						ClipSaving = WW.Now()
+						ClipContent.Stat('Saving...')
+					}
+				}
 			}).Stat('',0),
 			ClipTimeout = WW.To(5E3,function()
 			{
 				StoreSet(StoreKeyClipHeight,WV.CS(ClipContent.I,'height'))
 			},true).F();
 
-			Ext.On(ActionWebExtClip,ClipContent.V)
+			Ext.On(ActionWebExtClip,function(Q)
+			{
+				ClipContent.V(Q)
+				ClipContent.Stat(ClipSaving ? 'Saved in ' + (WW.Now() - ClipSaving) + 'ms' : '')
+				ClipSaving = 0
+			})
 			WV.CSS(ClipContent.I,'height',StoreGet(StoreKeyClipHeight) || '')
 			WV.ApR([ClipTitle,ClipContent],V)
 
