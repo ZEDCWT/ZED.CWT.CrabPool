@@ -232,7 +232,7 @@
 				{
 					return WW.Fmt
 					(
-						'body{height:100%}' +
+						'body{height:100%;font-size:14px;overflow:hidden}' +
 						'.`T`>.`M`{text-align:center;margin:6px 0}' +
 
 						'#`R`{padding:40px;text-align:center}' +

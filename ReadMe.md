@@ -78,6 +78,7 @@ You can also use it as an `Express.Router` and mount it to any path you like on 
 		+ `Control` : `boolean`. When `true`, then it currently requires a socket to transfer control messages, or when `false`, it requires a socket to establish tunnels.
 		+ `Log` : `(...Q : any[]) => any`. Write logs.
 		+ Returns : `Net.Socket | WishNS.Provider<Net.Socket>`
+	+ `Aux` : `boolean` Option. Default `true`. All traffic would transfer through the single node-master pipe if true, or each new connection will open a new pipe.
 	+ `Retry` : `number` Optional. Default `1E4`ms. Interval to wait before connecting to the Master again after the previous connection closed.
 	+ `Timeout` : `number` Optional. Default `3E5`ms. Time to wait to shutdown an inactive connection.
 	+ `Tick` : `number` Optional. Default `2E4`ms. Interval to transfer heartbeat packages.

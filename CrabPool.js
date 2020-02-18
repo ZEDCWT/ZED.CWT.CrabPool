@@ -5,6 +5,9 @@ WW = require('@zed.cwt/wish'),
 HTTP = require('http'),
 Net = require('net'),
 
+BuffFrom = Buffer.from,
+BuffCat = Buffer.concat,
+
 SocketOption = {allowHalfOpen : true},
 
 ActionHello = 'Hell',
@@ -12,6 +15,9 @@ ActionPing = 'Ping',
 ActionPong = 'Pong',
 ActionWish = 'Wish',
 ActionTake = 'Take',
+ActionWishAux = 'WishX',
+ActionTakeAux = 'TakeX',
+ActionAuxKill = 'AuxK',
 ActionPool = 'Pool',
 ActionPoolEdit = 'PoolEdit',
 ActionPoolDel = 'PoolDel',
@@ -46,6 +52,7 @@ module.exports = Option =>
 	PortMaster = Option.PortMaster,
 	PortWeb = Option.PortWeb,
 	PipeMaster = Option.Pipe,
+	Aux = WR.Default(true,Option.Aux),
 	Retry = Option.Retry || 1E4,
 	Timeout = WR.Default(3E5,Option.Timeout),
 	TickInterval = Option.Tick || 2E4,
@@ -53,6 +60,11 @@ module.exports = Option =>
 	PathLog = WN.JoinP(PathData,'Log'),
 	Log = Option.Log,
 	MakeLog = H => WW.IsFunc(Log) ? (...Q) => Log(`[${H}]`,...Q) : WW.O,
+
+	Feature =
+	{
+		Aux,
+	},
 
 	PathWeb = WN.JoinP(__dirname,'Web'),
 	FileID = WN.JoinP(PathData,'ID'),
@@ -97,11 +109,11 @@ module.exports = Option =>
 		}
 	},
 
-	EnsureD = Q => Q.D ? Q : {D : S => Q.data(S)},
-	MakeSec = (Pipe,OnJSON,OnRaw) =>
+	ToD = Q => Q.D || (S => Q.data(S)),
+	MakeSec = (Pipe,OnData,OnRaw) =>
 	{
 		var
-		C = EnsureD(Cipher()),D = EnsureD(Decipher()),
+		C = ToD(Cipher()),D = ToD(Decipher()),
 
 		Cache = [],CacheLen = 0,
 		Take = function*(Q,R)
@@ -111,7 +123,7 @@ module.exports = Option =>
 				Cache.push(yield)
 				CacheLen += Cache[~-Cache.length].length
 			}
-			if (1 in Cache) Cache[0] = Buffer.concat(Cache),Cache.length = 1
+			if (1 < Cache.length) Cache[0] = BuffCat(Cache),Cache.length = 1
 			R = Cache[0].slice(0,Q)
 			CacheLen -= Q
 			CacheLen ? Cache[0] = Cache[0].slice(Q) : Cache.pop()
@@ -122,38 +134,185 @@ module.exports = Option =>
 		{
 			for (;
 				T = yield* Take(2),
-				T = OnJSON(WC.JTOO((yield* Take(256 * T[1] + T[0])).toString('UTF8'))[1] || []),
-				undefined === T
+				T = 256 * T[1] + T[0],
+				// Apparently, 7 bytes are not enough for a JSON message `[_,[],_]`
+				T = 7 < T ?
+					OnData(WC.JTOO((yield* Take(T)).toString('UTF8'))[1] || []) :
+				(
+					T = yield* Take(2),
+					OnData(yield* Take(256 * T[1] + T[0]))
+				),
+				null == T
 			;);
-			clearInterval(Tick)
+			Tick.F()
 			Done = [T]
+			CacheLen && OnRaw(T ? Cache[0] : BuffFrom(D(Cache[0])))
+			Cache = CacheLen = Take = Now = null
 		}(),
 
-		W = Q => Pipe.destroyed || Pipe.write(Q),
+		W = Q => Pipe && Pipe.writable && Pipe.write(Q),
+		Pad = () => WW.Rnd(2) ?
+			WW.Rnd(3E16,9E16) :
+			WW.Key(WW.Rnd(20,40)),
 		O = Q =>
 		{
-			Q = Buffer.from(WC.OTJ([WW.Key(WW.Rnd(20,40)),Q,WW.Key(WW.Rnd(20,40))]),'UTF8')
-			W(Buffer.from(C.D([255 & Q.length,255 & Q.length >>> 8]).concat(C.D(Q))))
+			Q = BuffFrom(WC.OTJ([Pad(),Q,Pad()]),'UTF8')
+			W(BuffFrom(C([255 & Q.length,255 & Q.length >>> 8]).concat(C(Q))))
 		},
-		Tick = setInterval(() => Pipe.destroyed || O([ActionTick]),TickInterval);
+		Tick = WW.To(TickInterval,() => Pipe.writable && O([ActionTick]));
 
 		Now.next()
-		Pipe.on('data',Q => Done ? OnRaw(Done[0] ? Q : Buffer.from(D.D(Q))) : Now.next(Buffer.from(D.D(Q))))
-			.on('error',WW.O)
+		Pipe.on('error',WW.O)
+			.on('data',Q => Done ?
+				OnRaw(Done[0] ? Q : BuffFrom(D(Q))) :
+				Now.next(BuffFrom(D(Q))))
 		return {
-			D : Q => W(Buffer.from(C.D(Q))),
-			O : O,
-			E : () => clearInterval(Tick)
+			O,
+			D : Q => W(BuffFrom(C(Q))),
+			F : () => Pipe && Pipe.end(),
+			E : T =>
+			{
+				if (T = Pipe)
+				{
+					Pipe = null
+					Tick.F()
+					T.destroy()
+				}
+			},
+			U : Q => W(BuffFrom(C([0,0,255 & Q.length,255 & Q.length >>> 8]).concat(C(Q)))),
+			C : Tick.F
 		}
 	},
 
+	AuxIDBuff = (Q,R = []) =>
+	{
+		for (;
+			R.push(Q % 128 + 128 * (127 < Q)),
+			Q = Math.floor(Q / 128)
+		;);
+		return BuffFrom(R)
+	},
+	MakeAux = () =>
+	{
+		var
+		AuxID = 0,
+		Pool = {};
+		return {
+			Raw : S =>
+			{
+				var
+				ID,
+				To = WW.To(Timeout,() =>
+				{
+					To = null
+					ID && WR.Del(ID,Pool)
+					S.destroy()
+					S = null
+				}),
+				R =
+				{
+					ID : () =>
+					{
+						Pool[ID = WW.Key(32)] = R
+						return ID
+					},
+					I : O => S.on('end',O.F)
+						.on('data',Q => To.D(O.D(Q)))
+						.on('close',O.E),
+					D : Q => S && To.D(S.write(Q)),
+					F : () => S && S.end(),
+					E : () => To && To.F().C(),
+				};
+				S.on('error',WW.O)
+				return R
+			},
+			Sec : (M,H) =>
+			{
+				var
+				ID,P,
+				To = WW.To(Timeout,() =>
+				{
+					M = P = To = null
+					ID && WR.Del(ID,Pool)
+					H.E()
+					H = null
+				}),
+				R =
+				{
+					P : Q => Pool[ID = Q] = R,
+					I : O =>
+					{
+						M.on('end',O.F)
+							.on('close',O.E)
+						P = O
+					},
+					D : Q => H && To.D(H.D(Q)),
+					F : () => H && H.F(),
+					E : () => To && To.F().C(),
+					O : Q => H && H.O(Q),
+				};
+				R.H = H = MakeSec(M,H,Q => P && To.D(P.D(Q)))
+				H.C()
+				return R
+			},
+			Aux : S =>
+			{
+				var
+				P,
+				ID = AuxID++,
+				IDU,IDB,
+				Size = 65535,
+				To = WW.To(Timeout,() =>
+				{
+					IDB && S.O([ActionAuxKill,IDU])
+					S = To = null
+					WR.Del(ID,Pool)
+					P && P.E()
+					P = null
+				}),
+				R =
+				{
+					ID : ID,
+					I : O => P = O,
+					D : (Q,F) =>
+					{
+						if (S && IDB) for (F = 0;F < Q.length;)
+							S.U(BuffCat([IDB,Q.slice(F,F += Size)]))
+					},
+					F : () => S && IDB && S.U(IDB),
+					E : () => To && To.F().C(),
+					U : Q => (Size -= (IDB = AuxIDBuff(R.IDU = IDU = Q)).length,R),
+					X : Q => P && (Q.length ? P.D(Q) : P.F()),
+					O : Q => S && S.O(Q),
+				};
+				return Pool[ID] = R
+			},
+			Link : (Q,S) =>
+			{
+				Q.I(S)
+				S.I(Q)
+			},
+			X : Q => Pool[Q],
+			U : Q =>
+			{
+				var
+				ID = 0,
+				F = 0;
+				for (;
+					ID += Q[F] % 128 * 128 ** F,
+					127 < Q[F++]
+				;);
+				ID = Pool[ID]
+				ID && ID.X(Q.slice(F))
+			}
+		}
+	},
+	AuxPool = MakeAux(),
+	MakeAuxRaw = (H,P) => AuxPool.Raw(Net.createConnection({host : H,port : P,...SocketOption})),
+
 	//	Master
-	PoolKeySID = WW.Key(),
-	PoolKeyPipe = WW.Key(),
-	PoolKeySec = WW.Key(),
-	PoolKeyOnPartner = WW.Key(),
 	Pool = {},
-	PoolO = Q => WR.Each(V => V[PoolKeySec].O(Q),Pool),
+	PoolO = Q => WR.Each(V => V.Sec.O(Q),Pool),
 	PoolNotify = T =>
 	{
 		DataPool.S()
@@ -161,7 +320,9 @@ module.exports = Option =>
 		PoolO([ActionPool,T])
 		OnPool(T)
 	},
-	PoolPartner = {},
+	MEZErrMIDUnk = 'Who are you',
+	MEZErrMIDDup = 'You are not unique',
+	MEZErrSIDUnk = 'Who is that',
 	MakeMEZ = () =>
 	{
 		var
@@ -173,8 +334,7 @@ module.exports = Option =>
 			IP = RemoteIP(S),
 			Log = MakeLog(`MEZ ${Count()} ${IP}`),
 			MID,SessionID = WW.Key(32),
-			Err = Q => Sec.O([ActionError,Q]) || S.destroy(),
-			Partner,
+			Err = Q => Sec.O([ActionError,Q]) || Sec.E(),
 			Record,
 			Ping = MakePing(Q => Sec.O([ActionPing,Q]),Q =>
 			{
@@ -182,20 +342,24 @@ module.exports = Option =>
 				PoolO([ActionPing,MID,Q])
 				WebSocketSend([ActionWebPing,MID,Q])
 			}),
-			Sec = MakeSec(S,Q =>
+			Sec = AuxPool.Sec(S,Q =>
 			{
+				if (WW.IsBuff(Q)) return AuxPool.U(Q)
+
 				var K = Q[1],E = Q[2];
 				switch (Q[0])
 				{
 					case ActionHello :
-						if (!K) return Err('Who are you')
+						if (!K) return Err(MEZErrMIDUnk)
 						MID = IDSolve(K)
-						if (MID === MachineID) return Err('You are not unique')
+						if (MID === MachineID) return Err(MEZErrMIDDup)
+
 						WR.Has(MID,Pool) &&
 						(
-							Pool[MID][PoolKeySec].O([ActionError,'You are not unique']),
-							Pool[MID][PoolKeyPipe].destroy()
+							Pool[MID].Sec.O([ActionError,MEZErrMIDDup]),
+							Pool[MID].Sec.E()
 						)
+						E && (O.Feat = E)
 						Pool[MID] = O
 						Record = DataPool.D(MID)
 						if (!Record) Record = DataPool.D(MID,
@@ -207,7 +371,8 @@ module.exports = Option =>
 						++Record.Num
 						Record.IP = IP
 						Record.From = WW.Now()
-						Sec.O([ActionHello,MachineID])
+
+						Sec.O([ActionHello,MachineID,Feature])
 						PoolNotify()
 						Log('Node')
 						Sec.O([ActionPing,DataPing])
@@ -223,25 +388,60 @@ module.exports = Option =>
 						break
 
 					case ActionWish :
-						if (!WR.Has(MID = IDSolve(K),Pool)) return Err('Who are you')
-						if (E === MachineID) MakeMEZTake(O,MID,Q[3],Q[4])
+						if (!WR.Has(MID = IDSolve(K),Pool)) return Err(MEZErrMIDUnk)
+						if (E === MachineID)
+						{
+							E = MakeAuxRaw(Q[3],Q[4])
+							AuxPool.Link(S,E)
+						}
 						else
 						{
-							if (!WR.Has(E,Pool)) return Err('Who is that')
-							PoolPartner[SessionID] = O
-							Pool[E][PoolKeySec].O([ActionWish,SessionID,MID,Q[3],Q[4]])
+							if (!WR.Has(E,Pool)) return Err(MEZErrSIDUnk)
+							Sec.P(SessionID)
+							MEZToWish(SessionID,E,MID,Q[3],Q[4])
 						}
+						Sec.H.C()
 						Log('Wish')
 						return false
 					case ActionTake :
-						if (!WR.Has(MID = IDSolve(K),Pool)) return Err('Who are you')
-						if (!WR.Has(E,PoolPartner)) return Err('Who is that')
-						Partner = PoolPartner[E]
-						Partner[PoolKeyOnPartner](O)
+						if (!WR.Has(MID = IDSolve(K),Pool)) return Err(MEZErrMIDUnk)
+						E = AuxPool.X(E)
+						if (!E) return Err(MEZErrSIDUnk)
 						Sec.O([ActionWish])
-						Partner[PoolKeySec].O([ActionWish])
+						MEZToTake(E)
+						AuxPool.Link(E,Sec)
+						Sec.H.C()
 						Log('Take')
 						return false
+					case ActionWishAux :
+						if (K === MachineID)
+						{
+							K = MakeAuxRaw(Q[3],Q[4])
+							E = AuxPool.Aux(Sec.H).U(E)
+							AuxPool.Link(K,E)
+						}
+						else
+						{
+							if (!WR.Has(K,Pool)) return Sec.O([ActionAuxKill,E])
+							E = AuxPool.Aux(Sec.H).U(E)
+							MEZToWish(E.ID,K,MID,Q[3],Q[4])
+						}
+						break
+					case ActionTakeAux :
+						K = AuxPool.X(K)
+						E = AuxPool.X(E)
+						if (!K || !E) return Sec.O([ActionAuxKill,Q[3]])
+						E.U(Q[3])
+						MEZToTake(K)
+						AuxPool.Link(K,E)
+						break
+					case ActionAuxKill :
+						if (K = AuxPool.X(K))
+						{
+							K.E()
+							WW.IsObj(K.S) && K.S.E()
+						}
+						break
 
 					case ActionPoolEdit :
 						MEZPoolEdit(Q)
@@ -262,58 +462,44 @@ module.exports = Option =>
 						break
 
 					case ActionError :
-					default : S.destroy()
+					default : Sec.E()
 				}
-			},Q => Partner && Partner[PoolKeySec].D(Q)),
+			}),
 			O =
 			{
-				[PoolKeySID] : SessionID,
-				[PoolKeyPipe] : S,
-				[PoolKeySec] : Sec,
-				[PoolKeyOnPartner] : Q => Partner = Q
+				ID : SessionID,
+				Sec,
+				Feat : {},
 			};
 			S.on('close',E =>
 			{
 				Log('Closed',Timer(),E)
 				Ping.F()
 				Sec.E()
-				if (MID && Pool[MID] && SessionID === Pool[MID][PoolKeySID])
+				if (MID && Pool[MID] && SessionID === Pool[MID].ID)
 				{
 					Record.S = 0
 					Record.To = WW.Now()
 					WR.Del(MID,Pool)
 					PoolNotify()
 				}
-				Partner && Partner[PoolKeyPipe].destroy()
-				WR.Del(SessionID,PoolPartner)
-			}).on('end',() => Partner && Partner[PoolKeyPipe].end())
+			})
 			Log('Connected')
 		}).listen(PortMaster || 0)
 			.on('listening',() => MakeLog('MEZ')('Listening',Master.address().port));
 	},
-	MakeMEZTake = (O,MID,Host,Port) =>
+	MEZToWish = (ID,Target,MID,Host,Port) =>
 	{
-		var
-		Timer = MakeTime(),
-		Log = MakeLog(`Take ${IDName(MID)} ${Host}:${Port} ${IDShort(O[PoolKeySID])}`),
-		S = Net.createConnection({host : Host,port : Port,timeout : Timeout,...SocketOption});
-
-		O[PoolKeyOnPartner](
-		{
-			[PoolKeyPipe] : S,
-			[PoolKeySec] : {D : Q => S.write(Q)}
-		})
-		S.on('error',WW.O)
-			.on('timeout',() => S.destroy())
-			.on('close',E =>
-			{
-				Log('Fin',Timer(),E)
-				O[PoolKeyPipe].destroy()
-			})
-			.on('end',() => O[PoolKeyPipe].end())
-			.on('data',O[PoolKeySec].D)
-		O[PoolKeySec].O([ActionWish])
-		Log('ACK')
+		Target = Pool[Target]
+		Aux && Target.Feat.Aux ?
+			Target.Sec.O([ActionWishAux,ID,MID,Host,Port,AuxPool.Aux(Target.Sec.H).ID]) :
+			Target.Sec.O([ActionWish,ID,MID,Host,Port])
+	},
+	MEZToTake = S =>
+	{
+		WW.IsNum(S.IDU) ?
+			S.O([ActionTakeAux,S.IDU,S.ID]) :
+			S.O([ActionWish])
 	},
 	MEZPoolEditValid = new Set(['Name','Desc']),
 	MEZPoolEdit = (Q,S) =>
@@ -336,7 +522,8 @@ module.exports = Option =>
 	},
 
 	//	Node
-	Online,
+	MEZSec,
+	MEZFeature,
 	MakePipeCount = Counter(),
 	MakePipe = (Q,S) => WX.Just()
 		.FMap(R => WX.IsProvider(R = PipeMaster(Q,MakeLog(`Pipe ${MakePipeCount()}`))) ? R : WX.Just(R))
@@ -357,14 +544,16 @@ module.exports = Option =>
 			}),
 			Sec = MakeSec(M,Q =>
 			{
+				if (WW.IsBuff(Q)) return AuxPool.U(Q)
 				var K = Q[1],E = Q[2];
 				switch (Q[0])
 				{
 					case ActionHello :
-						Log('Online')
+						Log('ONE')
 						MEZID = K
+						MEZFeature = E || {}
+						MEZSec = Sec
 						WebSocketSend([ActionWebMEZ,RemoteIP(M)])
-						Online = Sec
 						Ping.R()
 						break
 					case ActionPing :
@@ -384,7 +573,42 @@ module.exports = Option =>
 						break
 
 					case ActionWish :
-						MakeQBHTake(Q)
+						MakePipe(false,(M,O) =>
+						{
+							var
+							Log = MakeLog(`Take ${IDName(Q[2])} ${Q[3]}:${Q[4]}`),
+							S = MakeAuxRaw(Q[3],Q[4]),
+							Sec = AuxPool.Sec(M,Q =>
+							{
+								if (ActionWish === Q[0]) return false
+								ActionError === Q[0] && Log(...Q)
+								ActionTick === Q[0] || O.F()
+							});
+							Sec.O([ActionTake,MachineIDRaw,Q[1]])
+							Sec.H.C()
+							AuxPool.Link(S,Sec)
+							return S.E
+						}).Now(null,WW.O)
+						break
+					case ActionWishAux :
+						E = MakeAuxRaw(Q[3],Q[4])
+						Q = AuxPool.Aux(Sec).U(Q[5])
+						Sec.O([ActionTakeAux,K,Q.IDU,Q.ID])
+						AuxPool.Link(Q,E)
+						break
+					case ActionTakeAux :
+						K = AuxPool.X(K)
+						if (!K) return Sec.O([ActionAuxKill,E])
+						K.U(E)
+						AuxPool.Link(K,K.S)
+						WR.Del('S',K)
+						break
+					case ActionAuxKill :
+						if (K = AuxPool.X(K))
+						{
+							K.E()
+							WW.IsObj(K.S) && K.S.E()
+						}
 						break
 
 					case ActionTick : break
@@ -399,62 +623,22 @@ module.exports = Option =>
 						break
 
 					case ActionError : Log(...Q)
-					default : M.destroy()
+					default : Sec.E()
 				}
 			});
-			Log('Begin')
-			M.on('connect',() => Log('Connected'))
-				.on('close',E =>
-				{
-					Log('Closed',Timer(),E)
-					Online = false
-					WebSocketSend([ActionWebMEZ,false])
-					Ping.F()
-					Sec.E()
-					O.E()
-				})
-			Sec.O([ActionHello,MachineIDRaw])
+			Log('BIN')
+			M.on('close',E =>
+			{
+				Log('COD',Timer(),E)
+				MEZSec = false
+				WebSocketSend([ActionWebMEZ,false])
+				Ping.F()
+				Sec.E()
+				O.E()
+			})
+			Sec.O([ActionHello,MachineIDRaw,Feature])
 		}).RetryWhen(Q => Q.Delay(Retry)).Now()
 	},
-	MakeQBHTake = Q => MakePipe(false,(M,O) =>
-	{
-		var
-		Timer = MakeTime(),
-		Log = MakeLog(`Take ${IDName(Q[2])} ${Q[3]}:${Q[4]} ${IDShort(Q[1])}`),
-		S = Net.createConnection({host : Q[3],port : Q[4],timeout : Timeout,...SocketOption}),
-		Sec = MakeSec(M,Q =>
-		{
-			switch (Q[0])
-			{
-				case ActionWish :
-					Log('ACK')
-					S.on('data',Sec.D)
-					return false
-				case ActionTick : break
-				case ActionError : Log(...Q)
-				default : O.F()
-			}
-		},Q => S.write(Q));
-		M.on('connect',() => Log('Connected'))
-			.on('close',E =>
-			{
-				Log('Closed',Timer(),E)
-				Sec.E()
-				O.F()
-			})
-			.on('end',() => S.end())
-		S.on('error',WW.O)
-			.on('timeout',O.F)
-			.on('close',E =>
-			{
-				Log('Fin',Timer(),E)
-				O.F()
-			})
-			.on('end',() => M.end())
-		Sec.O([ActionTake,MachineIDRaw,Q[1]])
-		Sec.E()
-		return () => M.destroy() | S.destroy()
-	}).Now(null,WW.O),
 
 	//	Wish
 	PoolWishKeyServer = WW.Key(),
@@ -473,112 +657,48 @@ module.exports = Option =>
 		Server = Net.createServer(SocketOption,S =>
 		{
 			var
-			Timer = MakeTime(),
 			Log = MakeLog(`Wish ${IDShort(ID)} ${Count()} ${IDName(Target)} ${Host}:${Port}`),
-			Sec,
-			Partner,SessionID;
+			Sec;
 			++State.Visit
 			++State.Using
 			State.Last = WW.Now()
 			LinkSNotify()
-			S.on('error',WW.O)
-				.on('close',() => LinkSNotify(--State.Using))
-			if (PipeMaster) Online ?
-				MakePipe(false,(M,O) =>
-				{
-					Sec = MakeSec(M,Q =>
-					{
-						switch (Q[0])
+			S = AuxPool.Raw(S.on('close',() => LinkSNotify(--State.Using)))
+			PipeMaster ?
+				MEZSec ?
+					Aux && MEZFeature.Aux ?
+					(
+						Sec = AuxPool.Aux(MEZSec),
+						MEZSec.O([ActionWishAux,Target,Sec.ID,Host,Port]),
+						Sec.S = S
+					) :
+						MakePipe(false,(M,O) =>
 						{
-							case ActionWish :
-								Log('Granted')
-								S.on('data',Sec.D)
-								return false
-							case ActionTick : break
-							case ActionError : Log(...Q)
-							default : O.F()
-						}
-					},Q => S.write(Q))
-					M.on('connect',() => Log('Connected'))
-						.on('close',E =>
-						{
-							Log('Closed',Timer(),E)
-							Sec.E()
-							O.F()
-						})
-						.on('end',() => S.end())
-					S.setTimeout(Timeout)
-						.on('timeout',O.F)
-						.on('close',E =>
-						{
-							Log('Fin',Timer(),E)
-							O.F()
-						})
-						.on('end',() => M.end())
-					Sec.O([ActionWish,MachineIDRaw,Target,Host,Port])
-					Sec.E()
-					return () => M.destroy() | S.destroy()
-				}).Now(null,WW.O,() => S.destroy()) :
-				S.destroy()
-			else if (Target === MachineID)
-			{
-				Sec = Net.createConnection({host : Host,port : Port,timeout : Timeout,...SocketOption})
-					.on('error',WW.O)
-					.on('timeout',() => Sec.destroy())
-					.on('close',E =>
-					{
-						Log('Closed',Timer(),E)
-						S.destroy()
-					})
-					.on('data',Q => S.write(Q))
-					.on('end',() => S.end())
-				S.setTimeout(Timeout)
-					.on('error',WW.O)
-					.on('timeout',() => S.destroy())
-					.on('close',E =>
-					{
-						Log('Closed',Timer(),E)
-						Sec.destroy()
-					})
-					.on('data',Q => Sec.write(Q))
-					.on('end',() => Sec.end())
-			}
-			else if (WR.Has(Target,Pool))
-			{
-				PoolPartner[SessionID = WW.Key(32)] =
-				{
-					[PoolKeyPipe] : S,
-					[PoolKeySec] :
-					{
-						O : () =>
-						{
-							Log('Granted')
-							S.setTimeout(Timeout)
-								.on('timeout',() => S.destroy())
-								.on('close',E =>
-								{
-									Log('Fin',Timer(),E)
-									Partner[PoolKeyPipe].destroy()
-								})
-								.on('end',() => Partner[PoolKeyPipe].end())
-								.on('data',Partner[PoolKeySec].D)
-						},
-						D : Q => S.write(Q)
-					},
-					[PoolKeyOnPartner] : Q => Partner = Q
-				}
-				Pool[Target][PoolKeySec].O([ActionWish,SessionID,MachineID,Host,Port])
-			}
-			else S.destroy()
+							Sec = AuxPool.Sec(M,Q =>
+							{
+								if (ActionWish === Q[0]) return AuxPool.Link(S,Sec),false
+								ActionError === Q[0] && Log(...Q)
+								ActionTick === Q[0] || O.F()
+							})
+							Sec.O([ActionWish,MachineIDRaw,Target,Host,Port])
+							Sec.H.C()
+							M.on('close',O.F)
+							return S.E
+						}).Now(null,S.E,S.E) :
+					S.E() :
+				Target === MachineID ?
+					AuxPool.Link(S,MakeAuxRaw(Host,Port)) :
+					WR.Has(Target,Pool) ?
+						Pool[Target].Sec.O([ActionWish,S.ID(),MachineID,Host,Port]) :
+						S.E()
 		}).listen(Local)
 			.on('listening',() =>
 			{
-				Log('Deployed at',State.Port = Server.address().port)
-				DataLinkS.s
+				Log('DEP',State.Port = Server.address().port)
 				LinkSNotify()
 				WebSocketSend([ActionWebLinkError,ID])
 			})
-			.on('close',() => Log('Closed',Timer()))
+			.on('close',() => Log('COD',Timer()))
 			.on('error',E =>
 			{
 				WebSocketSend([ActionWebLinkError,ID,String(E)])
@@ -671,7 +791,7 @@ module.exports = Option =>
 			var
 			Err = S => Send([ActionWebError,Q[0],S]),
 			K,O,
-			CheckOnline = () => Online || Err('Master is not connected'),
+			CheckOnline = () => MEZSec || Err('Master is not connected'),
 			CheckLink = S =>
 				!S[1] ? Err('Host is required') :
 				!DataPool.D(S[1]) ? Err('Invalid host') :
@@ -711,12 +831,12 @@ module.exports = Option =>
 
 				case ActionWebPoolEdit :
 					PipeMaster ?
-						CheckOnline() && Online.O([ActionPoolEdit,K,O,Q[3]]) :
+						CheckOnline() && MEZSec.O([ActionPoolEdit,K,O,Q[3]]) :
 						MEZPoolEdit(Q)
 					break
 				case ActionWebPoolDel :
 					PipeMaster ?
-						CheckOnline() && Online.O([ActionPoolDel,K]) :
+						CheckOnline() && MEZSec.O([ActionPoolDel,K]) :
 						MEZPoolDel(Q)
 					break
 
@@ -796,7 +916,7 @@ module.exports = Option =>
 					{
 						case ActionWebExtClip :
 							PipeMaster ?
-								CheckOnline() && Online.O([ActionExt,ActionExtClip,O]) :
+								CheckOnline() && MEZSec.O([ActionExt,ActionExtClip,O]) :
 								MEZExtClip(O)
 							break
 					}
