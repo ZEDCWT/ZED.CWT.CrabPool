@@ -345,7 +345,6 @@ module.exports = Option =>
 			Sec = AuxPool.Sec(S,Q =>
 			{
 				if (WW.IsBuff(Q)) return AuxPool.U(Q)
-
 				var K = Q[1],E = Q[2];
 				switch (Q[0])
 				{
@@ -495,7 +494,7 @@ module.exports = Option =>
 		Target = Pool[Target]
 		Aux && Target.Feat.Aux ?
 			Target.Sec.O([ActionWishAux,ID,MID,Host,Port,AuxPool.Aux(Target.Sec.H).ID]) :
-			Target.Sec.O([ActionWish,ID,MID,Host,Port])
+			Target.Sec.O([ActionWish,String(ID),MID,Host,Port])
 	},
 	MEZToTake = S =>
 	{
