@@ -159,7 +159,7 @@ module.exports = Option =>
 			Q = BuffFrom(WC.OTJ([Pad(),Q,Pad()]),'UTF8')
 			W(BuffFrom(C([255 & Q.length,255 & Q.length >>> 8]).concat(C(Q))))
 		},
-		Tick = WW.To(TickInterval,() => Pipe.writable && O([ActionTick]));
+		Tick = WW.To(TickInterval,() => Pipe.writable && O([ActionTick]),true);
 
 		Now.next()
 		Pipe.on('error',WW.O)
@@ -230,12 +230,13 @@ module.exports = Option =>
 			{
 				var
 				ID,P,
+				S,
 				To = WW.To(Timeout,() =>
 				{
 					M = P = To = null
 					ID && WR.Del(ID,Pool)
-					H.E()
-					H = null
+					S.E()
+					S = null
 				}),
 				R =
 				{
@@ -246,13 +247,12 @@ module.exports = Option =>
 							.on('close',O.E)
 						P = O
 					},
-					D : Q => H && To.D(H.D(Q)),
-					F : () => H && H.F(),
+					D : Q => S && To.D(S.D(Q)),
+					F : () => S && S.F(),
 					E : () => To && To.F().C(),
-					O : Q => H && H.O(Q),
+					O : Q => S && To.D(S.O(Q)),
 				};
-				R.H = H = MakeSec(M,H,Q => P && To.D(P.D(Q)))
-				H.C()
+				R.H = S = MakeSec(M,Q => H(Q,To.D()),Q => P && To.D(P.D(Q)))
 				return R
 			},
 			Aux : S =>
@@ -276,13 +276,13 @@ module.exports = Option =>
 					I : O => P = O,
 					D : (Q,F) =>
 					{
-						if (S && IDB) for (F = 0;F < Q.length;)
+						if (S && IDB) for (To.D(F = 0);F < Q.length;)
 							S.U(BuffCat([IDB,Q.slice(F,F += Size)]))
 					},
 					F : () => S && IDB && S.U(IDB),
 					E : () => To && To.F().C(),
 					U : Q => (Size -= (IDB = AuxIDBuff(R.IDU = IDU = Q)).length,R),
-					X : Q => P && (Q.length ? P.D(Q) : P.F()),
+					X : Q => P && (Q.length ? To.D(P.D(Q)) : P.F()),
 					O : Q => S && S.O(Q),
 				};
 				return Pool[ID] = R
@@ -393,6 +393,7 @@ module.exports = Option =>
 						{
 							E = MakeAuxRaw(Q[3],Q[4])
 							AuxPool.Link(E,Sec)
+							Sec.O([ActionWish])
 						}
 						else
 						{
@@ -419,6 +420,7 @@ module.exports = Option =>
 							K = MakeAuxRaw(Q[3],Q[4])
 							E = AuxPool.Aux(Sec.H).U(E)
 							AuxPool.Link(K,E)
+							MEZToTake(E)
 						}
 						else
 						{
