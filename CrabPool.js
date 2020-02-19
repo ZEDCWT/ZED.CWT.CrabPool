@@ -392,7 +392,7 @@ module.exports = Option =>
 						if (E === MachineID)
 						{
 							E = MakeAuxRaw(Q[3],Q[4])
-							AuxPool.Link(S,E)
+							AuxPool.Link(E,Sec)
 						}
 						else
 						{
@@ -499,7 +499,7 @@ module.exports = Option =>
 	{
 		WW.IsNum(S.IDU) ?
 			S.O([ActionTakeAux,S.IDU,S.ID]) :
-			S.O([ActionWish])
+			S.O && S.O([ActionWish])
 	},
 	MEZPoolEditValid = new Set(['Name','Desc']),
 	MEZPoolEdit = (Q,S) =>
