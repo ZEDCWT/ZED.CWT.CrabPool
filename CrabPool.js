@@ -159,6 +159,7 @@ module.exports = Option =>
 			Q = BuffFrom(WC.OTJ([Pad(),Q,Pad()]),'UTF8')
 			W(BuffFrom(C([255 & Q.length,255 & Q.length >>> 8]).concat(C(Q))))
 		},
+		OnEnd = new Set,
 		Tick = WW.To(TickInterval,() => Pipe.writable && O([ActionTick]),true);
 
 		Now.next()
@@ -166,6 +167,13 @@ module.exports = Option =>
 			.on('data',Q => Done ?
 				OnRaw(Done[0] ? Q : BuffFrom(D(Q))) :
 				Now.next(BuffFrom(D(Q))))
+			.on('close',() =>
+			{
+				WR.Each(V =>
+				{
+					V()
+				},OnEnd,OnEnd = new Set)
+			})
 		return {
 			O,
 			D : Q => W(BuffFrom(C(Q))),
@@ -180,6 +188,12 @@ module.exports = Option =>
 				}
 			},
 			U : Q => W(BuffFrom(C([0,0,255 & Q.length,255 & Q.length >>> 8]).concat(C(Q)))),
+			W : (Q,S) =>
+			{
+				S ?
+					OnEnd.add(Q) :
+					OnEnd.delete(Q)
+			},
 			C : Tick.F
 		}
 	},
@@ -265,11 +279,13 @@ module.exports = Option =>
 				To = WW.To(Timeout,() =>
 				{
 					IDB && S.O([ActionAuxKill,IDU])
+					S.W(OnEnd,false)
 					S = To = null
 					WR.Del(ID,Pool)
 					P && P.E()
 					P = null
 				}),
+				OnEnd = () => To && To.F().C(),
 				R =
 				{
 					ID : ID,
@@ -280,11 +296,12 @@ module.exports = Option =>
 							S.U(BuffCat([IDB,Q.slice(F,F += Size)]))
 					},
 					F : () => S && IDB && S.U(IDB),
-					E : () => To && To.F().C(),
+					E : OnEnd,
 					U : Q => (Size -= (IDB = AuxIDBuff(R.IDU = IDU = Q)).length,R),
 					X : Q => P && (Q.length ? To.D(P.D(Q)) : P.F()),
 					O : Q => S && S.O(Q),
 				};
+				S.W(OnEnd,true)
 				return Pool[ID] = R
 			},
 			Link : (Q,S) =>
@@ -781,7 +798,7 @@ module.exports = Option =>
 		Send = D =>
 		{
 			D = Cipher.D(WC.OTJ([WW.Key(WW.Rnd(20,40)),D,WW.Key(WW.Rnd(20,40))]))
-			try{S.send(WC.B91S(D))}catch(_){}
+			try{S.send(BuffFrom(D))}catch(_){}
 		},
 		Suicide = () => S.terminate(),
 		Wait = WW.To(Timeout,Suicide);
@@ -800,8 +817,9 @@ module.exports = Option =>
 				!WW.IsSafe(S[3] = +S[3]) || S[3] < 0 || 65535 < S[3] ? Err('Port should be a number in range [0,65535]') :
 				true;
 
+			if (!WW.IsBuff(Q)) return
 			Wait.D()
-			Q = Decipher.D(WC.B91P(Q))
+			Q = Decipher.D(Q)
 			Q = WC.JTOO(WC.U16S(Q))
 			if (!WW.IsArr(Q) || !WW.IsArr(Q = Q[1])) return Suicide()
 			K = Q[1]

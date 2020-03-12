@@ -8,7 +8,6 @@
 	WB = WW.B,
 	WV = WW.V,
 	Top = Wish.Top,
-	WebSocket = Top.WebSocket,
 	Confirm = Top.confirm,
 
 	ActionWebHello = 'Hell',
@@ -31,7 +30,6 @@
 
 	ClassCard = WW.Key(),
 
-	Href = location.href.replace(/[?#].*/,'').replace(/^http/,'ws'),
 	IDShort = function(Q){return Q.slice(0,8)},
 	Sure = function(Q,S){Confirm(Q) && S()},
 
@@ -51,45 +49,42 @@
 	MachineID,
 	TokenStepA = function(Q){return WC.HSHA512(Q,MachineID)},
 	TokenStepB = function(Q){return WC.HSHA512(MachineID,Q)},
-	MakeWebSocket = function(Key)
+	WSTouched,WSShaked,
+	WSCipher,WSDecipher,
+	WSKey,
+	WS = WB.WS(
 	{
-		var
-		Client = new WebSocket(Href),
-		Suicide = function(){Client.close()},
-		Touched,Shaked,
-		Cipher,Decipher;
-		Client.onmessage = function(Q)
+		Rect : false,
+		Str : function(Q)
 		{
-			var K,O;
-			if (!Cipher)
+			if (!WSCipher)
 			{
-				MachineID = Q.data
-				Key = TokenStepA(Key)
-				Q = TokenStepB(Key)
-				Cipher = WC.AESES(Q,Q,WC.CFB)
-				Decipher = WC.AESDS(Q,Q,WC.CFB)
+				MachineID = Q
+				WSKey = TokenStepA(WSKey)
+				Q = TokenStepB(WSKey)
+				WSCipher = WC.AESES(Q,Q,WC.CFB)
+				WSDecipher = WC.AESDS(Q,Q,WC.CFB)
 				WebSocketSend = function(Q)
 				{
-					if (1 === Client.readyState)
-					{
-						Q = Cipher.D(WC.OTJ([WW.Key(WW.Rnd(20,40)),Q,WW.Key(WW.Rnd(20,40))]))
-						Client.send(WC.B91S(Q))
-						return true
-					}
+					Q = WSCipher.D(WC.OTJ([WW.Key(WW.Rnd(20,40)),Q,WW.Key(WW.Rnd(20,40))]))
+					WS.D(Q)
+					return true
 				}
-				WebSocketSend([ActionWebHello,WC.B91S(Key)])
-				Q = Key = null
-				return
+				WebSocketSend([ActionWebHello,WC.B91S(WSKey)])
+				Q = WSKey = null
 			}
-			Q = Decipher.D(WC.B91P(Q.data))
+		},
+		Bin : function(Q,K,O)
+		{
+			Q = WSDecipher.D(Q)
 			Q = WC.JTOO(WC.U16S(Q))
-			if (!WW.IsArr(Q) || !WW.IsArr(Q = Q[1])) return Suicide()
+			if (!WW.IsArr(Q) || !WW.IsArr(Q = Q[1])) return WS.F()
 			K = Q[1]
 			O = Q[2]
 			switch (Q[0])
 			{
 				case ActionWebHello :
-					Online = Shaked = true
+					Online = WSShaked = true
 					NotiOnline('Connected')
 					NotiOnline(false)
 					MachineID = K
@@ -139,24 +134,23 @@
 					Noti.S(['Error | ',K,' | ',O])
 					break
 
-				default : Suicide()
+				default : WS.F()
 			}
-		}
-		Client.onopen = function()
+		},
+		Hsk : function()
 		{
-			Touched = true
+			WSTouched = true
 			NotiOnline('Handshaking...')
-		}
-		Client.onclose = function()
+		},
+		End : function()
 		{
+			WSKey = null
 			Online = Connecting = false
 			WebSocketSend = WebSocketNotConnected
-			NotiOnline(['Offline | ',Touched ? Shaked ? 'Connection closed' : 'Failed to handshake, the token may not be correct' : 'Timeout'])
+			NotiOnline(['Offline | ',WSTouched ? WSShaked ? 'Connection closed' : 'Failed to handshake, the token may not be correct' : 'Timeout'])
 			RTab.At(0)
 		}
-		NotiOnline('Connecting...')
-		Connecting = true
-	},
+	}),
 
 	DataPoolMap = {},DataPoolList = [],
 	OnConnect,OnMEZ,OnPoolPool,OnPing,
@@ -182,7 +176,10 @@
 				if (Connecting) Noti.S('Already ' + (Online ? 'connected' : 'connecting'))
 				else
 				{
-					MakeWebSocket(Token.V())
+					WSKey = Token.V()
+					NotiOnline('Connecting...')
+					Connecting = true
+					WS.C()
 					Token.V('').Fresh().Foc()
 				}
 			},
