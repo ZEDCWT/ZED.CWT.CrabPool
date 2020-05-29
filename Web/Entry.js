@@ -144,6 +144,7 @@
 		},
 		End : function()
 		{
+			WSCipher = null
 			WSKey = null
 			Online = Connecting = false
 			WebSocketSend = WebSocketNotConnected

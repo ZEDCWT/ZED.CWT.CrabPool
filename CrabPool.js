@@ -739,6 +739,15 @@ module.exports = Option =>
 				Server.close()
 			}
 		};
+		if (!WW.IsObj(State))
+		{
+			DataLinkS.D(ID,State =
+			{
+				Visit : 0,
+				Using : 0,
+				Port : -9
+			})
+		}
 		State.Port = -1
 		State.Using = 0
 		LinkSNotify()
