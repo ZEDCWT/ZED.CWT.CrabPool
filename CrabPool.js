@@ -968,6 +968,7 @@ module.exports = Option =>
 
 	return {
 		Log,
+		ID : () => MachineID,
 		Pool : WN.MakeDir(PathLog)
 			.FMap(() => WN.FileR(FileID)
 				.ErrAs(() => WN.FileW(FileID,WW.Key(320))

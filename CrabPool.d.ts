@@ -17,6 +17,7 @@ declare module CrabPoolNS
 			Log? : ((...Q : any[]) => any) | false
 		}) : {
 			Log(...Q : any[]) : any
+			ID() : string
 			/**Express.Router*/
 			Exp(Express? : object) : object
 			/**WS.on('connection')*/

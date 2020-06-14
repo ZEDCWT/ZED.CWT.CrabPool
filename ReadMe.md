@@ -86,6 +86,7 @@ You can also use it as an `Express.Router` and mount it to any path you like on 
 	+ `Log` : `(...Q : any[]) => any` Optional. Control how should `CrabPool` logs.
 + Returns : `Object`
 	+ `Log` : `(...Q : any[]) => any`. Log to where `CrabPool` logs.
+	+ `ID` : `() => string`. Return the ID of the current Node.
 	+ `Exp` : `(Express? : require('express')) => require('express').Router`. Given an optional `Express` object, returns a Router. See [Example : Custom Web Server][ExWeb]
 	+ `Soc` : `Function`. Used to handle event `require('ws')::on('connection')`. See [Example : Custom Web Server][ExWeb]
 
