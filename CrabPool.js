@@ -707,7 +707,7 @@ module.exports = Option =>
 				Target === MachineID ?
 					AuxPool.Link(S,MakeAuxRaw(Host,Port)) :
 					WR.Has(Target,Pool) ?
-						Pool[Target].Sec.O([ActionWish,S.ID(),MachineID,Host,Port]) :
+						MEZToWish(S.ID(),Target,MachineID,Host,Port) :
 						S.E()
 		}).listen(Local)
 			.on('listening',() =>

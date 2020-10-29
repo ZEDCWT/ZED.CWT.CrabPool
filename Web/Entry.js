@@ -91,6 +91,7 @@
 					OnConnect(O)
 					break
 				case ActionWebMEZ :
+					RTopState.S(K ? 'Online' : 'Offline')
 					OnMEZ(K)
 					break
 				case ActionWebToken :
@@ -161,7 +162,7 @@
 
 	Rainbow = WV.Div(2,['10%'],true),
 	RTab = WV.Split({Pan : Rainbow,Main : true}),
-	RTopState = WV.Fmt('Online `O` / `N`\nLink `L` / `I`','-');
+	RTopState = WV.Fmt('`S` `O` / `N`\nLink `L` / `I`','-');
 
 	WV.CSS(Rainbow[1],'min-width',100)
 	WV.Ap(RTopState.R,RTab.B)
