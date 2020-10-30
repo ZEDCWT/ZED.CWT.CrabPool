@@ -52,6 +52,7 @@
 	WSTouched,WSShaked,
 	WSCipher,WSDecipher,
 	WSKey,
+	WSOnOffline = WW.BusS(),
 	WS = WB.WS(
 	{
 		Rect : false,
@@ -91,7 +92,7 @@
 					OnConnect(O)
 					break
 				case ActionWebMEZ :
-					RTopState.S(K ? 'Online' : 'Offline')
+					RTopState.S(K ? 'Online ' : 'Offline ')
 					OnMEZ(K)
 					break
 				case ActionWebToken :
@@ -151,6 +152,8 @@
 			WebSocketSend = WebSocketNotConnected
 			NotiOnline(['Offline | ',WSTouched ? WSShaked ? 'Connection closed' : 'Failed to handshake, the token may not be correct' : 'Timeout'])
 			RTab.At(0)
+			RTopState.S('')
+			WSOnOffline.D()
 		}
 	}),
 
@@ -162,7 +165,10 @@
 
 	Rainbow = WV.Div(2,['10%'],true),
 	RTab = WV.Split({Pan : Rainbow,Main : true}),
-	RTopState = WV.Fmt('`S` `O` / `N`\nLink `L` / `I`','-');
+	RTopState = WV.Fmt('`S``O` / `N`\nLink `L` / `I`','-')
+		.S(''),
+
+	TickPool = [];
 
 	WV.CSS(Rainbow[1],'min-width',100)
 	WV.Ap(RTopState.R,RTab.B)
@@ -183,6 +189,9 @@
 					Connecting = true
 					WS.C()
 					Token.V('').Fresh().Foc()
+					TokenEnt.Off()
+					TokenNew.On()
+					TokenNewEnt.On()
 				}
 			},
 			Token = WV.Inp(
@@ -190,6 +199,13 @@
 				Hint : 'Token',
 				Pass : true,
 				Ent : Connect
+			}),
+			TokenEnt = WV.But(
+			{
+				X : 'Connect',
+				The : WV.TheO,
+				Blk : true,
+				C : Connect
 			}),
 			SaveNew = function()
 			{
@@ -205,25 +221,26 @@
 				Hint : 'New Token',
 				Pass : true,
 				Ent : SaveNew
-			});
+			}).Off(),
+			TokenNewEnt = WV.But(
+			{
+				X : 'Save New Token',
+				The : WV.TheO,
+				Blk : true,
+				C : SaveNew
+			}).Off();
 
 			NotiOnline('Offline, enter the Token to connect')
+			WSOnOffline.R(function()
+			{
+				TokenEnt.On()
+				TokenNew.Off()
+				TokenNewEnt.Off()
+			})
 			WV.ApR(
 			[
-				Token,WV.But(
-				{
-					X : 'Connect',
-					The : WV.TheO,
-					Blk : true,
-					C : Connect
-				}),
-				TokenNew,WV.But(
-				{
-					X : 'Save New Token',
-					The : WV.TheO,
-					Blk : true,
-					C : SaveNew
-				})
+				Token,TokenEnt,
+				TokenNew,TokenNewEnt
 			],R)
 			WV.Ap(R,V)
 			return {
@@ -248,7 +265,7 @@
 				Hide : function(){Token.V('').Fresh(),TokenNew.V('').Fresh()}
 			}
 		}],
-		['Pool',function(V)
+		['Pool',function(V,_,K)
 		{
 			var
 			MakeCard = function()
@@ -272,7 +289,8 @@
 				},
 				Name = MakeEdit({Hint : 'Unnamed'},'Name'),
 				Desc = MakeEdit({Type : WV.InpPX,Hint : 'No Description'},'Desc'),
-				Last = WV.Fmt('Created at `O`. Total : `L`. Last on `F` => `T`','-'),
+				Last = WV.Fmt('Created at `O`. Total : `L`. Last on `F` => `T``S`','-')
+					.S(''),
 				Del = WV.But(
 				{
 					X : 'Remove',
@@ -292,6 +310,8 @@
 				}).Off(),
 				R =
 				{
+					S : false,
+					V : Last,
 					R : U,
 					I : function(Q,S){return WV.Text(Index,Q + ' / ' + S),R},
 					H : function(Q)
@@ -316,6 +336,8 @@
 						IP || State.I(Q.IP)
 						Last.O(WW.StrDate(Q.Boom)).L(Q.Num)
 							.F(WW.StrDate(Q.From)).T(Q.S ? 'Now' : WW.StrDate(Q.To))
+						R.S = Q.S && Q.From
+						if (!Q.S) Last.S('')
 						WV.AD(Last.R,'Boom',Q.Boom)
 						WV.AD(Last.R,'From',Q.From)
 						WV.AD(Last.R,'To',Q.S ? null : Q.To)
@@ -347,6 +369,16 @@
 					Q.M(true)
 					CardCurrent = Q
 				}
+			},
+
+			UpdateNowDelta = function(V)
+			{
+				if (V.S) V.V.S(' (' + WW.StrS((WW.Now() - V.S) / 1E3) + ')')
+			},
+			UpdateNowDeltaTick = function()
+			{
+				UpdateNowDelta(CardMEZ)
+				WR.Each(UpdateNowDelta,CardQBH)
 			};
 			OnConnect = function(Q)
 			{
@@ -383,6 +415,10 @@
 				},WW.IsObj(Q) ? Q : WR.OfObj(Q,S))
 			}
 			WV.Ap(WV.HR(),V)
+			TickPool.push(function()
+			{
+				RTab.Is(K) && UpdateNowDeltaTick()
+			})
 			return {
 				CSS : function(ID)
 				{
@@ -398,7 +434,8 @@
 							C : ClassCard,
 						}
 					)
-				}
+				},
+				Show : UpdateNowDeltaTick
 			}
 		}],
 		['Link',function(V)
@@ -675,5 +712,9 @@
 	{
 		WV.ApA([Rainbow[0],Noti.R],WV.Body)
 		RTab.At(0)
+		WW.To(500,function()
+		{
+			WR.Each(function(V){V()},TickPool)
+		},true)
 	})
 }()
