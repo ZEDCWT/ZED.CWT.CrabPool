@@ -1,6 +1,6 @@
 {
 	"name" : "crabpool",
-	"version" : "0.3.1",
+	"version" : "0.3.2",
 	"description" : "Yet Another Private Network Solution",
 	"main" : "CrabPool",
 	"repository" :
@@ -12,10 +12,6 @@
 	"license" : "MIT",
 	"dependencies" :
 	{
-		"@zed.cwt/wish" : ">=0.3.0"
-	},
-	"devDependencies" :
-	{
-		"ws" : ">=7.3.0"
+		"@zed.cwt/wish" : ">=0.4.4"
 	}
 }
