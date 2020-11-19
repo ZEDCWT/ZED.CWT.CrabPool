@@ -355,7 +355,8 @@
 					D : function(){return WV.Del(U),R}
 				};
 				WV.ClsA(Del.R,WV.None)
-				WV.Ap(WV.ApR([Index,State,Name,Desc,Last,Del],U),V)
+				WV.Ap(Del.R,State.R)
+				WV.Ap(WV.ApR([Index,State,Name,Desc,Last],U),V)
 				return R
 			},
 			CardMEZ = MakeCard(),
@@ -428,7 +429,8 @@
 						'.`C`{padding:20px}' +
 						'fieldset.`C`{padding:4px 20px 20px}' +
 						'.`C`>*{margin:4px 0}' +
-						'.`C` legend{margin:0}',
+						'.`C` legend{margin:0}' +
+						'.`C` button{padding-top:0;padding-bottom:0}',
 						{
 							R : ID,
 							C : ClassCard,
@@ -441,6 +443,7 @@
 		['Link',function(V)
 		{
 			var
+			ClassControl = WW.Key(),
 			ClassDesc = WW.Key(),
 			HR = WV.HR(),
 			HostSel = [],
@@ -486,10 +489,16 @@
 				ID,O,
 				U = WV.Rock(ClassCard + ' ' + WV.S4,'fieldset'),
 				Index = WV.A('legend'),
-				Enabled = WV.Cho({Set : [[9,'Enabled'],[0,'Disabled']],Inp : function(V)
+				Control = WV.Rock(ClassControl),
+				Enabled = WV.Cho(
 				{
-					WebSocketSend([ActionWebLinkSwitch,ID,V])
-				}}),
+					Set : [[9,'Enabled'],[0,'Disabled']],
+					Blk : false,
+					Inp : function(V)
+					{
+						WebSocketSend([ActionWebLinkSwitch,ID,V])
+					}
+				}),
 				Host = MakeHost().S(HostSel),
 				Addr = MakeAddr(),
 				Deploy = MakeDeploy(),
@@ -550,7 +559,8 @@
 						return R
 					}
 				};
-				WV.After(WV.ApR([Index,Enabled,Host,Addr,Deploy,State,Save,Del],U),HR)
+				WV.ApR([Enabled,Save,Del],Control)
+				WV.After(WV.ApR([Index,Control,Host,Addr,Deploy,State],U),HR)
 				return R
 			},
 
@@ -629,9 +639,11 @@
 					return WW.Fmt
 					(
 						'#`R`>*{margin:20px}' +
+						'.`C`>*{vertical-align:middle}' +
 						'.`D`{font-size:.9em;color:#A9A9A9}',
 						{
 							R : ID,
+							C : ClassControl,
 							D : ClassDesc
 						}
 					)
