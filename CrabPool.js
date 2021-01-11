@@ -230,9 +230,9 @@ module.exports = Option =>
 						Pool[ID = WW.Key(32)] = R
 						return ID
 					},
-					I : O => S.on('end',O.F)
-						.on('data',Q => To.D(O.D(Q)))
-						.on('close',O.E),
+					I : O => S.once('end',O.F)
+						.on('data',Q => To && To.D(O.D(Q)))
+						.once('close',O.E),
 					D : Q => S && To.D(S.write(Q)),
 					F : () => S && S.end(),
 					E : () => To && To.F().C(),
@@ -257,8 +257,8 @@ module.exports = Option =>
 					P : Q => Pool[ID = Q] = R,
 					I : O =>
 					{
-						M.on('end',O.F)
-							.on('close',O.E)
+						M.once('end',O.F)
+							.once('close',O.E)
 						P = O
 					},
 					D : Q => S && To.D(S.D(Q)),
