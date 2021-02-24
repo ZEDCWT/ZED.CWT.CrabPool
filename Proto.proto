@@ -1,0 +1,359 @@
+syntax = 'proto3';
+
+
+
+// Should cut the connection
+message Fatal
+{
+	string Msg = 1;
+}
+
+// Should notify the user
+message Err
+{
+	string Msg = 1;
+}
+
+// For debug use
+message Warn
+{
+	string Msg = 1;
+}
+
+
+
+message Hello
+{
+	bytes Sec = 1;
+	uint64 Row = 2;
+	uint64 Master = 3;
+	// This part is designed for replay attack
+	uint64 Syn = 4;
+	uint64 Ack = 5;
+
+	string VerNode = 8;
+	string VerWish = 9;
+	string VerPool = 10;
+}
+
+message Ping
+{
+	uint64 Seed = 1;
+}
+
+message Noise
+{
+	bytes Seed = 1;
+}
+
+
+
+message Pool
+{
+	uint64 Row = 1;
+	uint64 Enabled = 2;
+	// Non DB field
+	uint64 Online = 3;
+	uint64 Birth = 4;
+	string VerNode = 5;
+	string VerWish = 6;
+	string VerPool = 7;
+	string Name = 8;
+	string Desc = 9;
+	string IP = 10;
+	uint64 Ping = 11;
+	uint64 Count = 12;
+	uint64 LastOn = 13;
+	uint64 LastOff = 14;
+	uint64 F2T = 15;
+	uint64 T2F = 16;
+}
+
+message PoolNm
+{
+	uint64 Row = 1;
+	string Nm = 2;
+}
+
+message PoolDes
+{
+	uint64 Row = 1;
+	string Des = 2;
+}
+
+message PoolDel
+{
+	uint64 Row = 1;
+}
+
+
+
+message Wish
+{
+	uint64 ID = 1;
+	uint64 From = 2;
+	uint64 To = 3;
+
+	string Host = 8;
+	uint32 Port = 9;
+}
+
+message Take
+{
+	uint64 From = 1;
+	uint64 To = 2;
+}
+
+message AuxFin
+{
+	uint64 ID = 1;
+}
+
+message AuxEnd
+{
+	uint64 ID = 1;
+}
+
+message AuxPR
+{
+	uint64 ID = 1;
+	bool Pause = 2;
+}
+
+
+
+message Link
+{
+	uint64 Row = 1;
+	uint64 Online = 2;
+	uint64 Birth = 3;
+	uint64 Local = 4;
+	uint64 Target = 5;
+	string Host = 6;
+	uint64 Port = 7;
+	uint64 Visit = 8;
+	uint64 Last = 9;
+	uint64 F2T = 10;
+	uint64 T2F = 11;
+	// Non DB field
+	uint64 Using = 12;
+	// Non DB field
+	uint64 Deploy = 13;
+	// Non DB field
+	string Err = 14;
+}
+
+message LinkNew
+{
+	uint64 IsGlobal = 1;
+	uint64 Local = 2;
+	uint64 Target = 3;
+	string Addr = 4;
+}
+
+message LinkOn
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+}
+
+message LinkOff
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+}
+
+message LinkMod
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+	uint64 Local = 3;
+	uint64 Target = 4;
+	string Addr = 5;
+}
+
+message LinkDel
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+}
+
+
+
+message Ext
+{
+	string Key = 1;
+	string Val = 2;
+}
+
+message ExtSet
+{
+	string Key = 1;
+	string Val = 2;
+}
+
+
+
+message NodeStatus
+{
+	uint64 Online = 1;
+	uint64 Row = 2;
+	uint64 Master = 3;
+	string MasterIP = 4;
+}
+
+message TokenNew
+{
+	bytes Old = 1;
+	bytes New = 2;
+}
+
+
+
+message OnPoolLst
+{
+	repeated Pool Pool = 1;
+}
+
+message OnPoolNew
+{
+	uint64 Row = 1;
+	uint64 Birth = 2;
+	// Since ID is only visible by the Master, it will not be sent
+}
+
+message OnPoolNm
+{
+	uint64 Row = 1;
+	string Nm = 2;
+}
+
+message OnPoolDes
+{
+	uint64 Row = 1;
+	string Des = 2;
+}
+
+message OnPoolOn
+{
+	uint64 Row = 1;
+	string IP = 2;
+	uint64 At = 3;
+	string VN = 4;
+	string VW = 5;
+	string VP = 6;
+}
+
+message OnPoolOff
+{
+	uint64 Row = 1;
+	uint64 At = 2;
+}
+
+message OnPoolPing
+{
+	uint64 Row = 1;
+	uint64 Ping = 2;
+	uint64 At = 3;
+}
+
+message OnPoolDel
+{
+	uint64 Row = 1;
+}
+
+message OnPoolRec
+{
+	uint64 Row = 1;
+	uint64 F2T = 2;
+	uint64 T2F = 3;
+}
+
+
+
+message OnLinkLst
+{
+	uint64 IsGlobal = 1;
+	repeated Link Link = 2;
+}
+
+message OnLinkNew
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+	uint64 Birth = 3;
+	uint64 Local = 4;
+	uint64 Target = 5;
+	string Host = 6;
+	uint64 Port = 7;
+}
+
+message OnLinkOn
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+}
+
+message OnLinkOff
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+}
+
+message OnLinkCon
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+	uint64 At = 3;
+}
+
+message OnLinkDis
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+}
+
+message OnLinkMod
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+	uint64 Local = 3;
+	uint64 Target = 4;
+	string Host = 5;
+	uint64 Port = 6;
+}
+
+message OnLinkDel
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+}
+
+message OnLinkRec
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+	uint64 F2T = 3;
+	uint64 T2F = 4;
+}
+
+message OnLinkDep
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+	uint64 Deploy = 3;
+	string Err = 4;
+}
+
+
+
+message OnExtLst
+{
+	repeated Ext Ext = 1;
+}
+
+message OnExtSet
+{
+	string Key = 1;
+	string Val = 2;
+}

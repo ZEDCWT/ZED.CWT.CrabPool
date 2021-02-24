@@ -10,6 +10,7 @@ CrabPool aims to create a centralized network that one can access resources rela
 + [API]
 + [Misc](#misc)
 + [Examples](#examples)
++ [Changelog](#changelog)
 
 
 
@@ -30,12 +31,12 @@ const CrabPool = require('crabpool')
 CrabPool(
 {
 	Cipher : () => <A cipher, will be described in section API>,
-	Deipher : () => <A decipher, will be described in section API>,
-	PortMaster : 2412 // Port to deploy the master
+	Deipher : () => <A decipher, responses to the cipher above>,
+	PortMaster : 3389 // Port to deploy the master
 })
 ```
 
-### Create a node
+### Create a Node
 ```js
 const CrabPool = require('crabpool')
 const Net = require('net')
@@ -44,7 +45,7 @@ CrabPool(
 {
 	Cipher : () => <The same cipher used by the master>,
 	Deipher : () => <The same decipher used by the master>,
-	Pipe : () => Net.createConnection(2412,'IP to the master')
+	Pipe : () => Net.createConnection(3389,'IP to the master')
 })
 ```
 
@@ -61,7 +62,7 @@ CrabPool(
 	PortWeb : 4000
 })
 ```
-Then a local web server `localhost:4000` will be deployed and can be visited from browsers (that support WebSocket). The initial manage token can be found in the log, which will be described in section [API], prefixed with `Key`.
+Then a local web server `localhost:4000` will be deployed and can be visited from browsers (that support WebSocket). The initial manage token can be found in the [Data Folder](#data-folder-structure)
 You can also use it as an `Express.Router` and mount it to any path you like on an existing server, which will also be described in the [API] section.
 
 
@@ -70,38 +71,36 @@ You can also use it as an `Express.Router` and mount it to any path you like on 
 
 ### CrabPool(Option)
 + `Option` : `Object`
-	+ `Cipher` : `() => WishNS.Algo | {data(Q : Buffer) : Buffer}` Required. A cipher to encrypt/compress/etc the data stream, must not use block ciphers that output only when blocks are filled (such as `aes-128-cbc`). See [Example : Cipher][ExCipher]
-	+ `Decipher` : `() => WishNS.Algo | {data(Q : Buffer) : Buffer}` Required. A decipher responses to the `Cipher` above. See [Example : Cipher][ExCipher]
-	+ `PortMaster` : `number` Optional. Port to deploy a Master server.
+	+ `Cipher` : `import('crypto').Cipher` Optional. A cipher to encrypt/compress/etc the data stream, must not use block ciphers that output only when blocks are filled (such as `AES-CBC`). Leave empty if the socket is already secured or for debug use. See [Example : Cipher][ExCipher]
+	+ `Decipher` : `import('crypto').Cipher` Optional. A decipher responses to the `Cipher` above. See [Example : Cipher][ExCipher]
+	+ `PortMaster` : `number` Required for the Master, must not be present for Nodes. Port to deploy a Master server.
 	+ `PortWeb` : `number` Optional. Port to deploy the Web Server.
-	+ `Pipe(Control,Log)` Require for Nodes, must not be present for the Master. See [Example : Pipe][ExPipe]
-		+ `Control` : `boolean`. When `true`, then it currently requires a socket to transfer control messages, or when `false`, it requires a socket to establish tunnels.
+	+ `Pipe(Log)` Require for Nodes, must not be present for the Master. See [Example : Pipe][ExPipe]
 		+ `Log` : `(...Q : any[]) => any`. Write logs.
 		+ Returns : `Net.Socket | WishNS.Provider<Net.Socket>`
-	+ `Aux` : `boolean` Option. Default `true`. All traffic would transfer through the single node-master pipe if true, or each new connection will open a new pipe.
-	+ `Retry` : `number` Optional. Default `1E4`ms. Interval to wait before connecting to the Master again after the previous connection closed.
+	+ `PipeRetry` : `number` Optional. Default `1E4`ms. Interval to wait before connecting to the Master again after the previous connection closed.
 	+ `Timeout` : `number` Optional. Default `3E5`ms. Time to wait to shutdown an inactive connection.
-	+ `Tick` : `number` Optional. Default `2E4`ms. Interval to transfer heartbeat packages.
-	+ `Data` : `string` Optional. Default : Windows `%AppData%/ZED/CrabPool`, Unix `%HOME%/.local/share/ZED/CrabPool`, Mac `%HOME%/Library/Preferences/ZED/CrabPool`. Path to store settings, logs and other files. See [Data Folder Structure](#data-folder-structure)
+	+ `Tick` : `number` Optional. Default `2E4`ms. Heartbeat interval.
+	+ `Data` : `string` Optional. Path to store settings, logs and other files. See [Data Folder Structure](#data-folder-structure)
 	+ `Log` : `(...Q : any[]) => any` Optional. Control how should `CrabPool` logs.
 + Returns : `Object`
-	+ `Log` : `(...Q : any[]) => any`. Log to where `CrabPool` logs.
-	+ `ID` : `() => string`. Return the ID of the current Node.
-	+ `Exp` : `(Express? : require('express')) => require('express').Router`. Given an optional `Express` object, returns a Router. See [Example : Custom Web Server][ExWeb]
-	+ `Soc` : `Function`. Used to handle event `require('ws')::on('connection')`. See [Example : Custom Web Server][ExWeb]
+	+ `Exp` : `(Express? : import('express').Router) => import('express').Router`. Given an optional `Express.Router` object, returns the Router. See [Example : Custom Web Server][ExWeb]
+	+ `Soc` : `(S : import('ws'),H : import('http').IncomingMessage) => any`. Used to handle event `import('ws')::on('connection')`. See [Example : Custom Web Server][ExWeb]
 
 
 
 ## Misc
 
 ### Data Folder Structure
+Windows `%AppData%/ZED/CrabPool`  
+Unix `%HOME%/.local/share/ZED/CrabPool`  
+Mac `%HOME%/Library/Preferences/ZED/CrabPool`  
 ```sh
 ZED/CrabPool
 +-- ID # Unique machine ID, randomly generated on the first run.
-+-- Key # The manage token for the Web Server, randomly generated on the first run, the original token will also be logged.
-+-- Pool.json # The database of all machines in the network.
-+-- Link.json # The database of Links.
-+-- LinkS.json # Status of Links.
++-- Key # The manage token for the Web Server, randomly generated on the first run
++-- Pool.db # The database
++-- Session.json # Stores the previous connection status
 +-- Log/ # All logs will be output here.
 |   +-- Event*.log
 ```
@@ -111,7 +110,6 @@ ZED/CrabPool
 ## Examples
 
 ### Example : Cipher
-Use `crypto`
 ```js
 const Crypto = require('crypto')
 const Key = ...
@@ -119,21 +117,8 @@ const IV = ...
 
 CrabPool(
 {
-	Cipher : () => Crypto.createCipheriv('aes-128-cfb',Key,IV),
-	Decipher : () => Crypto.createDecipheriv('aes-128-cfb',Key,IV),
-})
-```
-Use bundled methods
-```js
-const CrabPool = require('crabpool')
-const Wish = require('@zed.cwt/wish')
-const Key = 'A key ...' || Buffer.from('A key ...')
-const IV = 'An IV' || Buffer.from('An IV')
-
-CrabPool(
-{
-	Cipher : () => Wish.C.AESES(Key,IV,Wish.C.CFB),
-	Decipher : () => Wish.C.AESDS(Key,IV,Wish.C.CFB)
+	Cipher : () => Crypto.createCipheriv('AES-128-CFB',Key,IV),
+	Decipher : () => Crypto.createDecipheriv('AES-128-CFB',Key,IV),
 })
 ```
 
@@ -145,7 +130,7 @@ const Net = require('net')
 
 CrabPool(
 {
-	Pipe : () => Net.createConnection({host : ...,port : ...,allowHalfOpen : ...})
+	Pipe : () => Net.createConnection({host : ...,port : ...})
 })
 ```
 Connect to the Master with dynamic address
@@ -158,7 +143,7 @@ let Addr
 
 CrabPool(
 {
-	Pipe : Wish.X.WrapPromise((Control,Log) =>
+	Pipe : Wish.X.WrapPromise(Log =>
 	{
 		if (!Control && Addr) return Promise.resolve(Net.createConnection(Addr))
 		return ResolveAddr()
@@ -173,7 +158,7 @@ CrabPool(
 // Can also use RxJS here
 CrabPool(
 {
-	Pipe : Wish.X.WrapRx((Control,Log) =>
+	Pipe : Wish.X.WrapRx(Log =>
 	{
 		return RxJS.Observable<Net.Socket>
 	})
@@ -199,6 +184,20 @@ new WS.Server({server : Server,path : '/Fish/'})
 	.on('connection',Pool.Soc)
 ```
 And now you can visit from `localhost:8000/Fish`
+
+
+
+## Changelog
+
+### Updates from v0.x.x
+V1 is a rewrite of V0, including the following highlights
++ Extensible protocol. The size of message packets is up to 65535 in V0 including random paddings, making it impossible to handle larger messages. V1 now supports arbitrary sizes of messages.
++ Socket pause & resume. In an asymmetrical connection network for V0, data may be queued in the memory waiting to be sent, causing congestion issues. It is now handled in V1 by pausing & resuming at appropriate timing.
++ Database. V1 now uses SQLite instead of JSON files to persist infomation.
++ GlobalLink. It is now possible to configure common links at the Master side, the all nodes would benefit from them.
++ Statistic. V1 added few statistic fields to monitor the pool.
++ Active connection. It is now possible to monitor/cut active connections through the current node. Because of this, we removed the socket timeout facility, so that connections can stay as long as both the server & the client agree.
+
 
 
 
