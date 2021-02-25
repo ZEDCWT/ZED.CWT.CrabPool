@@ -1,5 +1,5 @@
 
-£
+Ö
 Proto.proto"
 Fatal
 Msg (	RMsg"
@@ -113,7 +113,37 @@ NodeStatus
 MasterIP (	RMasterIP".
 TokenNew
 Old (ROld
-New (RNew"&
+New (RNew"é
+Rec
+Row (RRow
+Online (ROnline
+Birth (RBirth
+	Connected (R	Connected
+Duration (RDuration
+HostFrom (RHostFrom
+HostTo (RHostTo
+Req (	RReq
+F2T	 (RF2T
+T2F
+ (RT2F"8
+RecReq
+Page (RPage
+PageSize (RPageSize"6
+RecRes
+Count (RCount
+Rec (2.RecRRec"
+RecCut
+Row (RRow"`
+Stat
+At (RAt
+InBound (RInBound
+OutBound (ROutBound
+Conn (RConn"
+StatReq
+TZ (RTZ":
+StatRes
+Today (RToday
+Stat (2.StatRStat"&
 	OnPoolLst
 Pool (2.PoolRPool"3
 	OnPoolNew

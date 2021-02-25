@@ -13,6 +13,7 @@ IDFrom = 7999,
 StatSpan = 36E5,
 StatInterval = 5E3,
 WebTimeout = 18E5,
+DayMS = 864E5,
 ErrorS = E => WW.IsObj(E) && WW.IsStr(E.stack) ?
 	E.stack :
 	E,
@@ -50,6 +51,11 @@ Proto =
 
 	NodeStatus : 0xA000,
 	TokenNew : 0xA002,
+	RecReq : 0xA004,
+	RecRes : 0xA006,
+	RecCut : 0xA008,
+	StatReq : 0xA00A,
+	StatRes : 0xA00C,
 
 
 
@@ -273,7 +279,7 @@ module.exports = Option =>
 		},
 		SetLst = L =>
 		{
-			var PrevRow = new Set(WR.Key(Row));
+			var PrevRow = new Set(List.map(V => V.Row));
 			LinkPortMap[IsGlobal ? 0 : 1] = PortMap = {}
 			List = L
 			Row = {}
@@ -582,15 +588,9 @@ module.exports = Option =>
 				F2T : IO[0],
 				T2F : IO[1],
 			})
-			if (Link)
+			if (Link && IOLink[0] + IOLink[1])
 			{
-				OnLinkRec(
-				{
-					IsGlobal : Link[0],
-					Row : Link[1],
-					F2T : IOLink[0],
-					T2F : IOLink[1],
-				})
+				OpLinkRec(Link[0],Link[1],IOLink[0],IOLink[1])
 				IOLink[0] = IOLink[1] = 0
 			}
 		},
@@ -786,6 +786,7 @@ module.exports = Option =>
 				if ((!S || S === SecExp) && Soc)
 				{
 					EndSocket(Soc)
+					OnRecOff(ID)
 					AuxPool.delete(ID)
 					Soc = null
 				}
@@ -972,7 +973,7 @@ module.exports = Option =>
 				N : boolean
 				P : number
 				K : U
-				S : (Q : N) => any
+				S : (Q : N,L : CrabPoolNS.DBLink) => any
 			) => (Q : N) => any
 		}
 	*/
@@ -1055,6 +1056,32 @@ module.exports = Option =>
 	OpLinkMod = (Sec,Data) => OpLinkCheck(Sec,Data) && OnLinkMod(Data),
 	OnLinkDel = OnDBLink(true,Proto.OnLinkDel,'Del'),
 	OnLinkRec = OnDBLink(false,Proto.OnLinkRec,'Rec'),
+	OpLinkRecPrev = [{},{}],
+	OpLinkRec = (IsGlobal,Row,F2T,T2F) =>
+	{
+		var
+		Prev = OpLinkRecPrev[IsGlobal ? 0 : 1],
+		Slot = Prev[Row];
+		if (Slot)
+		{
+			Slot[0] += F2T
+			Slot[1] += T2F
+		}
+		else
+		{
+			Slot = [F2T,T2F]
+			WW.To(StatInterval,function()
+			{
+				OnLinkRec(
+				{
+					IsGlobal,
+					Row,
+					F2T : Slot[0],
+					T2F : Slot[1],
+				})
+			})
+		}
+	},
 	OnLinkDeploy = (IsGlobal,Row,Deploy,Err) =>
 	{
 		var L = (IsGlobal ? LinkGlobal : Link).Get(Row);
@@ -1411,6 +1438,9 @@ module.exports = Option =>
 			Renew = null
 			Server = Net.createServer(S =>
 			{
+				if (PipeMaster && !MachineRow)
+					return EndSocket(S)
+
 				var
 				AuxID = ++RecID,
 				At = WW.Now(),
@@ -1456,7 +1486,11 @@ module.exports = Option =>
 						Port,
 					})
 				}
-				else Fin()
+				else
+				{
+					OnRecOff(AuxID)
+					Fin()
+				}
 			}).listen(ServerPort = Local)
 				.on('listening',() =>
 				{
@@ -1473,6 +1507,7 @@ module.exports = Option =>
 		{
 			Renew && Renew.F()
 			Server && Server.close()
+			OnLinkDeploy(IsGlobal,Row,null,null)
 			Server = ServerPort = Renew = null
 		},
 		OnChange = () =>
@@ -1687,6 +1722,43 @@ module.exports = Option =>
 						WebOnline.forEach(V => V.F('Token changed'))
 					},E => Err('Failed to save the new token\n' + E))
 			}),
+			[Proto.RecReq] : WithInit(Data =>
+			{
+				var
+				Page = Math.abs(0 | Data.Page),
+				PageSize = Math.abs(0 | Data.PageSize);
+
+				if (100 < PageSize)
+					return Err('PageSize too huge')
+
+				DB.RecCount().FMap(Count =>
+					DB.RecGet(Page,PageSize).Tap(Rec =>
+						Send(Proto.RecRes,{Count,Rec})))
+					.Now(null,E => Err(`Failed to load rec ${ErrorS(E)}`))
+			}),
+			[Proto.RecCut] : WithInit(Data =>
+			{
+				AuxOnFin(null,Data.Row)
+			}),
+			[Proto.StatReq] : WithInit(Data =>
+			{
+				var
+				TZ = 0 | Data.TZ,
+				Today = WW.Now();
+				if (2880 < Math.abs(TZ))
+					return Err('Inappropriate timezone ' + TZ)
+
+				Today -= TZ *= 6E4
+				Today -= Today % DayMS - TZ
+				DB.StatAfter(Today - 30 * DayMS)
+					.Now(Stat =>
+					{
+						Send(Proto.StatRes,{Today,Stat})
+					},E =>
+					{
+						Err(`Failed to load stat ${ErrorS(E)}`)
+					})
+			}),
 		});
 
 		Log('Accepted')
@@ -1764,6 +1836,7 @@ module.exports = Option =>
 					NodeStatus = DataSession.D(DataSessionKeyNodeStatus)
 					WW.IsObj(NodeStatus) || (NodeStatus = {})
 					NodeStatus.Online = false
+					MachineRow = NodeStatus.Row
 					if (NodeStatus.Row === NodeStatus.Master)
 					{
 						NodeStatus.Master = null

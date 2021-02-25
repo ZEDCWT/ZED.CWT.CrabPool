@@ -276,9 +276,19 @@ module.exports = Option =>
 				where ? = Row
 			`,[Q.Duration,Q.F2T,Q.T2F,Q.Row]),
 			RecOff : Q => Run(`update Rec set Online = 0 where ? = Row`,[Q]),
+			RecCount : () => Get('select count(*) Count from Rec').Map(B => B.Count),
+			RecGet : (Q,S) => All(
+			`
+				select * from Rec
+				order by
+					Online desc,
+					Row desc
+				limit ?,?
+			`,[Q * S,S]),
 
 			StatGet : Q => Get(`select * from Stat where ? = At`,[Q]),
 			StatRec : Q => Run(`replace into Stat values(?,?,?,?)`,[Q.At,Q.In,Q.Out,Q.Conn]),
+			StatAfter : Q => All('select * from Stat where ? <= At',[Q]),
 
 			ExtAll : () => All('select * from Ext'),
 			ExtLst : Q => WX.Merge(...Q.Ext.map(V =>

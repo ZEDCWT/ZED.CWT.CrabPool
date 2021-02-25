@@ -13,7 +13,10 @@
 
 
 
-	ClassList = WW.Key(),
+	DayMS = 864E5,
+
+
+
 	ClassCard = WW.Key(),
 
 	Noti = WV.Noti(),
@@ -21,7 +24,7 @@
 	NotiNewToken = Noti.O(),
 	ShortCut = WB.SC(),
 
-	Sure = function(Q,S){Confirm(Q) && S()},
+	Sure = function(Q,S){Confirm(Q.join('\n')) && S()},
 	StoreKey = '[CrabPool]~',
 	StoreKeyClipHeight = 'ClipHeight',
 	StoreGet = function(Q){return WB.StoG(StoreKey + Q)},
@@ -29,7 +32,7 @@
 
 	OnTick = WW.BusS(),
 
-	SolveSize = function(Q){return WR.ToSize(Q) + ' (' + Q + ')'},
+	SolveSize = function(Q){return null == Q ? '-' : WR.ToSize(Q) + ' (' + Q + ')'},
 
 	LogEnabled = false,
 	Log = function()
@@ -102,6 +105,11 @@
 	PoolIndex,
 	PoolShowBrief = function(Q){return '#' + Q.Row + ' ' + (Q.Name || '[Unnamed]')},
 	PoolShow = function(Q){return PoolShowBrief(Q) + (Q.Desc ? ' | ' + Q.Desc : '')},
+	PoolShowRow = function(Q)
+	{
+		var P = PoolMapRow[Q];
+		return P ? PoolShow(P) : '#' + Q + ' <Inactive Node>'
+	},
 	MakeLink = function()
 	{
 		var
@@ -235,6 +243,8 @@
 	},
 	ExtMap = {},
 	ExtOnChange = WW.Bus(),
+	RecOnRec,
+	StatOnStat,
 
 
 
@@ -363,6 +373,14 @@
 		{
 			NotiNewToken('New token saved, connect again')
 			NotiNewToken(false)
+		},
+		Proto.RecRes,function(Data)
+		{
+			RecOnRec(Data)
+		},
+		Proto.StatRes,function(Data)
+		{
+			StatOnStat(Data)
 		},
 
 
@@ -607,9 +625,9 @@
 					LinkData && Sure(
 					[
 						'Sure to remove this link?',
-						'[' + LinkData.Port + '] ' + PoolShow(PoolMapRow[LinkData.Target]),
+						'[' + LinkData.Port + '] ' + PoolShowRow(LinkData.Target),
 						LinkData.Addr
-					].join('\n'),function()
+					],function()
 					{
 						LinkData && WebSocketSend(Proto.LinkDel,
 						{
@@ -668,7 +686,8 @@
 				Idx : function(Q,S)
 				{
 					WV.T(Index,
-						WR.PadU(Q,~-S) + ' / ' + S)
+						WR.PadU(Q,~-S) + ' / ' + S +
+						' #' + LinkData.Row)
 				},
 				Cond : function(Q)
 				{
@@ -726,8 +745,7 @@
 		SortList = WR.Sort(function(Q,S)
 		{
 			return PoolIndex[Q.Target] - PoolIndex[S.Target] ||
-				S.Local - Q.Local ||
-				(S.Addr < Q.Addr ? -1 : Q.Addr < S.Addr)
+				Q.Local - S.Local
 		}),
 		ToDrop = WR.Map(function(V)
 		{
@@ -843,7 +861,6 @@
 			},CardList)
 		};
 
-		WV.ClsA(Pan,ClassList)
 		WV.ApR([NewTarget.R,NewAddr,NewDeploy,NewNew],NewCard)
 		WV.Ap(NewCard,Pan)
 		OnNode()
@@ -917,7 +934,9 @@
 	(
 		'body{height:100%;font-size:14px;overflow:hidden}' +
 
-		'.`L`>*{margin:20px}' +
+		'.`T`>.`M`{text-align:center;margin:6px 0}' +
+		'.`V`{padding:0 20px}' +
+		'.`V`>*{margin:20px 0}' +
 
 		'.`C`{padding:20px}' +
 		'fieldset.`C`{padding:4px 20px 20px}' +
@@ -926,7 +945,10 @@
 		'.`C` button{padding-top:0;padding-bottom:0}' +
 		'',
 		{
-			L : ClassList,
+			T : WV.TabT,
+			V : WV.TabW,
+			M : WV.FmtW,
+
 			C : ClassCard
 		}
 	))
@@ -1016,16 +1038,12 @@
 				{
 					return WW.Fmt
 					(
-						'.`T`>.`M`{text-align:center;margin:6px 0}' +
-
 						'#`R`{padding:40px;text-align:center}' +
 						'#`R`>div{margin:auto;padding:20px;max-width:26em}' +
 						'#`R` .`I`{margin:20px 0}',
 						{
 							R : ID,
-							I : WV.InpW,
-							T : WV.TabT,
-							M : WV.FmtW
+							I : WV.InpW
 						}
 					)
 				}
@@ -1078,7 +1096,7 @@
 								'Sure to remove this machine?',
 								PoolShowBrief(PoolData),
 								PoolData.Desc || '',
-							].join('\n'),function()
+							],function()
 							{
 								if (PoolData && !PoolData.Online)
 									WebSocketSend(Proto.PoolDel,{Row : PoolData.Row})
@@ -1241,8 +1259,6 @@
 				WR.Each(function(V){V.Tick()},CardList)
 			};
 
-			WV.ClsA(Pan,ClassList)
-
 			PoolOnData =
 			{
 				Node : function(Data)
@@ -1292,17 +1308,191 @@
 		}],
 		['GlobalLink',MakeLinkPanel(9)],
 		['Link',MakeLinkPanel(0)],
-		['Statistic',function(Pan)
+		['Statistic',function(Pan,_,PanK)
 		{
+			var
+			Page = 0,PageLoading,
+			PageSize = 20,
+			TZ = {TZ : new Date().getTimezoneOffset()},
+			ReloadTo = WW.To(5E3,function()
+			{
+				if (Online)
+				{
+					LoadRec()
+					WebSocketSend(Proto.StatReq,TZ)
+					ReloadTo.D()
+				}
+			},false,false),
+			Reload = WV.But(
+			{
+				X : 'Reload Statistic',
+				Blk : true,
+				The : WV.TheO,
+				C : ReloadTo.C
+			}),
 
+			MakeStat = function(Name,Delta)
+			{
+				var
+				U = WV.Rock(ClassCard + ' ' + WV.FmtW + ' ' + WV.S4);
+				WV.T(U,Name + ' -')
+				return {
+					R : U,
+					D : function(Q)
+					{
+						var
+						From = Q.Today - Delta * DayMS,
+						To = Delta ? Q.Today : 9 / 0,
+						Sent = 0,Received = 0,Conn = 0;
+						WR.Each(function(V)
+						{
+							if (From <= V.At && V.At < To)
+							{
+								Sent += V.OutBound
+								Received += V.InBound
+								Conn += V.Conn
+							}
+						},Q.Stat)
+						WV.T(U,
+						[
+							Name + ' ' + WW.StrDate(From) + ' => ' + (Delta ? WW.StrDate(Q.Today) : 'Now'),
+							'Sent ' + SolveSize(Sent) +
+								' Received ' + SolveSize(Received) +
+								' Connection ' + Conn
+						].join('\n'))
+					}
+				}
+			},
+			StatToday = MakeStat('Today',0),
+			StatYesterday = MakeStat('Yesterday',1),
+			StatLast7 = MakeStat('Last 7 days',7),
+			StatLast30 = MakeStat('Last 30 days',30),
+			StatAll =
+			[
+				StatToday,
+				StatYesterday,
+				StatLast7,
+				StatLast30
+			],
+
+			LoadRec = function(Q)
+			{
+				if (null != Q) Page = Q
+				WebSocketSend(Proto.RecReq,{Page : PageLoading = Page,PageSize : PageSize})
+			},
+			PagerT = WV.Page({Inp : LoadRec}),
+			PagerB = WV.Page({Inp : LoadRec}),
+			RecList = WV.Sist(
+			{
+				Make : function(V,S)
+				{
+					var
+					Card = WV.Rock(ClassCard + ' ' + WV.FmtW + ' ' + WV.S4,'fieldset'),
+					Index = WV.A('legend'),
+					Desc = WV.Rock(),
+					Cut = WV.But(
+					{
+						X : 'Disconnect',
+						The : WV.TheP,
+						C : function()
+						{
+							S.length && S[0].Online && Sure(
+							[
+								'Sure to disconnect it?',
+								WV.T(Desc)
+							],function()
+							{
+								WebSocketSend(Proto.RecCut,{Row : S[0].Row}) &&
+									LoadRec()
+							})
+						}
+					});
+					WV.ApR([Index,Desc],Card)
+					WV.Ap(Card,V)
+					return {
+						U : function(B)
+						{
+							WV.T(Index,'#' + B.Row)
+							B.Online && WV.Ap(Cut.R,Index)
+							WV.T(Desc,
+							[
+								'From ' + PoolShowRow(B.HostFrom),
+								'To ' + PoolShowRow(B.HostTo),
+								'Address ' + B.Req,
+								'Sent ' + SolveSize(B.F2T) + ' Received ' + SolveSize(B.T2F),
+								'Created ' + WW.StrDate(B.Birth) +
+									' Connected ' + (null == B.Connected ? '-' : '+' + WW.StrMS(B.Connected - B.Birth,true)) +
+									' Duration ' + WW.StrMS(B.Duration,true)
+							].join('\n'))
+						}
+					}
+				}
+			});
+
+			WV.ApR(
+			[
+				Reload,
+				StatToday,
+				StatYesterday,
+				StatLast7,
+				StatLast30,
+				WV.HR(),
+				PagerT,
+				RecList,
+				PagerB
+			],Pan)
+
+			RecOnRec = function(Data)
+			{
+				var
+				Max;
+				Max = WR.Ceil(Data.Count / PageSize)
+				PagerT.At(PageLoading,Max)
+				RecList.D(Data.Rec || [])
+				PagerB.At(PageLoading,Max)
+			}
+			StatOnStat = function(Data)
+			{
+				WR.Each(function(V){V.D(Data)},StatAll)
+			}
+
+			ShortCut.On('j',function()
+			{
+				RTab.Is(PanK) && PagerT.Prev()
+			}).On('k',function()
+			{
+				RTab.Is(PanK) && PagerT.Next()
+			})
+
+			return {
+				CSS : function(ID)
+				{
+					return WW.Fmt
+					(
+						'#`R` .`C`{margin:20px 0}',
+						{
+							R : ID,
+							C : ClassCard
+						}
+					)
+				},
+				Show : function()
+				{
+					ReloadTo.C()
+					RecList.In()
+				},
+				HideP : function()
+				{
+					ReloadTo.F()
+					RecList.Out()
+				}
+			}
 		}],
 		['Ext',function(Pan)
 		{
 			var
-			ClassTitle = WW.Key(),
-
 			ClipKey = 'Clip',
-			ClipTitle = WV.T(WV.Rock(ClassTitle),'Clipboard'),
+			ClipTitle = WV.X('Clipboard'),
 			ClipSaving,
 			ClipContent = WV.Inp(
 			{
@@ -1346,13 +1536,9 @@
 				{
 					return WW.Fmt
 					(
-						'#`R`{text-align:center}' +
-						'.`T`{margin:16px}' +
-						'#`R` .`I`{padding:0 16px}',
+						'#`R`{text-align:center}',
 						{
-							R : ID,
-							I : WV.InpW,
-							T : ClassTitle
+							R : ID
 						}
 					)
 				},

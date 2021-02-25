@@ -208,6 +208,56 @@ message TokenNew
 	bytes New = 2;
 }
 
+message Rec
+{
+	uint64 Row = 1;
+	uint64 Online = 2;
+	uint64 Birth = 3;
+	uint64 Connected = 4;
+	uint64 Duration = 5;
+	uint64 HostFrom = 6;
+	uint64 HostTo = 7;
+	string Req = 8;
+	uint64 F2T = 9;
+	uint64 T2F = 10;
+}
+
+message RecReq
+{
+	uint64 Page = 1;
+	uint64 PageSize = 2;
+}
+
+message RecRes
+{
+	uint64 Count = 1;
+	repeated Rec Rec = 2;
+}
+
+message RecCut
+{
+	uint64 Row = 1;
+}
+
+message Stat
+{
+	uint64 At = 1;
+	uint64 InBound = 2;
+	uint64 OutBound = 3;
+	uint64 Conn = 4;
+}
+
+message StatReq
+{
+	sint64 TZ = 1;
+}
+
+message StatRes
+{
+	uint64 Today = 1;
+	repeated Stat Stat = 2;
+}
+
 
 
 message OnPoolLst

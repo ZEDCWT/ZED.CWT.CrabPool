@@ -58,9 +58,12 @@ declare module CrabPoolNS
 			RecCon(Q : {Row : number,At : number}) : AnyP
 			RecRec(Q : {Row : number,Duration : number,F2T : number,T2F : number}) : AnyP
 			RecOff(Row : number) : AnyP
+			RecCount() : WishNS.Provider<number>
+			RecGet(Page : number,PageSize : number) : WishNS.Provider<Rec[]>
 
 			StatGet(At : number) : WishNS.Provider<Stat?>
 			StatRec(Q : {At : number,In : number,Out : number,Conn : number}) : AnyP
+			StatAfter(At : number) : WishNS.Provider<Stat[]>
 
 			ExtAll() : WishNS.Provider<Ext[]>
 			ExtLst(Q : {Ext : Ext[]}) : AnyP
@@ -142,6 +145,7 @@ declare module CrabPoolNS
 		Row? : number
 		Online? : number
 		Birth? : number
+		Connected? : number
 		Duration? : number
 		HostFrom? : number
 		HostTo? : number
