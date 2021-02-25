@@ -325,7 +325,6 @@
 				false
 			WebSocketSend = WebSocketNotConnected
 			RTab.At(0)
-			RTopState.S('Offline')
 			WSOnOffline.D()
 		}
 	}),
@@ -1063,7 +1062,7 @@
 
 				Card = WV.Rock(ClassCard + ' ' + WV.S4,'fieldset'),
 				Index = WV.A('legend'),
-				Identity = WV.Fmt('#`W` [`O` `P`ms] (`I` Node v`VN` Wish v`VW` Pool v`VP`)'),
+				Identity = WV.Fmt('#`W` [`O` `P`ms] (`I` Node v`VN` Wish v`VW` Pool v`VP`)','-',WV.A('span')),
 				MakeEdit = function(Opt,Act)
 				{
 					var V,R;
@@ -1113,13 +1112,12 @@
 						.VN(PoolData.VerNode)
 						.VW(PoolData.VerWish)
 						.VP(PoolData.VerPool)
-					PoolData.Online ?
+					PoolDataOnline ?
 						WV.ClsA(Del.Off().R,WV.None) :
 						WV.ClsR(Del.On().R,WV.None)
 					Stat
 						.V(PoolData.Count)
 						.T(PoolData.Online ? 'Now' : WW.StrDate(PoolData.LastOn))
-						.S()
 					OnTick()
 				},
 				OnTick = function()
@@ -1135,7 +1133,14 @@
 						.S(SolveSize(PoolData.F2T))
 						.C(SolveSize(PoolData.T2F))
 				};
-				WV.ApR([Index,Identity,Name,Desc,Stat],Card)
+				WV.ApR(
+				[
+					Index,
+					WV.ApR([Identity,Del],WV.Rock()),
+					Name,
+					Desc,
+					Stat
+				],Card)
 				return {
 					R : Card,
 					In : function(Q)
@@ -1263,7 +1268,9 @@
 			{
 				Node : function(Data)
 				{
-					RTopState.S(NodeIsMaster() ? 'Master' : 'Online')
+					RTopState.S(NodeIsMaster() ? 'Master' :
+						Data.Online ? 'Online' :
+						'Offline')
 					Data.Online &&
 						OnList(PoolList)
 				},
@@ -1311,6 +1318,8 @@
 		['Statistic',function(Pan,_,PanK)
 		{
 			var
+			ClassHint = WW.Key(),
+
 			Page = 0,PageLoading,
 			PageSize = 20,
 			TZ = {TZ : new Date().getTimezoneOffset()},
@@ -1323,6 +1332,7 @@
 					ReloadTo.D()
 				}
 			},false,false),
+			ReloadHint = WV.Rock(ClassHint),
 			Reload = WV.But(
 			{
 				X : 'Reload Statistic',
@@ -1421,7 +1431,8 @@
 								'Address ' + B.Req,
 								'Sent ' + SolveSize(B.F2T) + ' Received ' + SolveSize(B.T2F),
 								'Created ' + WW.StrDate(B.Birth) +
-									' Connected ' + (null == B.Connected ? '-' : '+' + WW.StrMS(B.Connected - B.Birth,true)) +
+									' Connected ' + (null == B.Connected ? '-' :
+										'+' + (B.Connected < 1E3 + B.Birth ? B.Connected - B.Birth + 'ms' : WW.StrMS(B.Connected - B.Birth,true))) +
 									' Duration ' + WW.StrMS(B.Duration,true)
 							].join('\n'))
 						}
@@ -1431,12 +1442,12 @@
 
 			WV.ApR(
 			[
-				Reload,
 				StatToday,
 				StatYesterday,
 				StatLast7,
 				StatLast30,
-				WV.HR(),
+				ReloadHint,
+				Reload,
 				PagerT,
 				RecList,
 				PagerB
@@ -1454,6 +1465,7 @@
 			StatOnStat = function(Data)
 			{
 				WR.Each(function(V){V.D(Data)},StatAll)
+				WV.T(ReloadHint,'Statistic loaded at ' + WW.StrDate())
 			}
 
 			ShortCut.On('j',function()
@@ -1469,10 +1481,12 @@
 				{
 					return WW.Fmt
 					(
-						'#`R` .`C`{margin:20px 0}',
+						'#`R` .`C`{margin:20px 0}' +
+						'.`H`{text-align:center}',
 						{
 							R : ID,
-							C : ClassCard
+							C : ClassCard,
+							H : ClassHint
 						}
 					)
 				},

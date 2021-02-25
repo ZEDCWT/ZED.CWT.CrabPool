@@ -1069,7 +1069,7 @@ module.exports = Option =>
 		}
 		else
 		{
-			Slot = [F2T,T2F]
+			Prev[Row] = Slot = [F2T,T2F]
 			WW.To(StatInterval,function()
 			{
 				OnLinkRec(
@@ -1079,6 +1079,7 @@ module.exports = Option =>
 					F2T : Slot[0],
 					T2F : Slot[1],
 				})
+				Prev[Row] = null
 			})
 		}
 	},
@@ -1303,7 +1304,7 @@ module.exports = Option =>
 				if (Row && MasterOnline.get(Row) === Sec)
 				{
 					MasterOnline.delete(Row)
-					OnPoolOff(Row,WW.Now())
+					OnPoolOff({Row,At : WW.Now()})
 				}
 			})
 			Log('Connected')
