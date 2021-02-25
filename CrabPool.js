@@ -8,7 +8,6 @@ HTTP = require('http'),
 Net = require('net'),
 
 PoolVersion = require('./package.json').version,
-SocketOption = {allowHalfOpen : true},
 IDFrom = 7999,
 StatSpan = 36E5,
 StatInterval = 5E3,
@@ -616,7 +615,7 @@ module.exports = Option =>
 			},
 		]
 	},
-	AuxMakeRaw = (Host,Port) => Net.createConnection({host : Host,port : Port,...SocketOption}),
+	AuxMakeRaw = (Host,Port) => Net.createConnection({host : Host,port : Port}),
 	AuxMakeRawRaw = (ID,From,SocQ,SocS,IsGlobal,Row) =>
 	{
 		var
