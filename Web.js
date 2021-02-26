@@ -1081,7 +1081,7 @@
 				{
 					PoolData && WebSocketSend(Proto.PoolDes,{Row : PoolData.Row,Des : V})
 				}),
-				Stat = WV.Fmt('Visited `V`. Sent `S`. Received `C`. Created `B`. Last `F` => `T``K`'),
+				Stat = WV.Fmt('Visited `V`. Sent `S`. Received `C`. Created `B`. Last `F` => `T` (`K`)'),
 				Del = WV.But(
 				{
 					X : 'Remove',
@@ -1117,15 +1117,16 @@
 						WV.ClsR(Del.On().R,WV.None)
 					Stat
 						.V(PoolData.Count)
-						.T(PoolData.Online ? 'Now' : WW.StrDate(PoolData.LastOn))
-					OnTick()
+						.T(PoolDataOnline ? 'Now' : WW.StrDate(PoolData.LastOff))
+					OnPassed()
+				},
+				OnPassed = function()
+				{
+					Stat.K(WW.StrS(((PoolData.Online ? WW.Now() : PoolData.LastOff) - PoolData.LastOn) / 1E3))
 				},
 				OnTick = function()
 				{
-					if (PoolData.Online)
-					{
-						Stat.K(' (' + WW.StrS((WW.Now() - PoolData.LastOn) / 1E3) + ')')
-					}
+					PoolData.Online && OnPassed()
 				},
 				OnRec = function()
 				{
@@ -1424,17 +1425,19 @@
 						{
 							WV.T(Index,'#' + B.Row)
 							B.Online && WV.Ap(Cut.R,Index)
-							WV.T(Desc,
+							WV.T(Desc,WR.Where(WR.Id,
 							[
-								'From ' + PoolShowRow(B.HostFrom),
+								'From ' + PoolShowRow(B.HostFrom) +
+									(B.Client ? ' (' + B.Client + ')' : ''),
 								'To ' + PoolShowRow(B.HostTo),
 								'Address ' + B.Req,
 								'Sent ' + SolveSize(B.F2T) + ' Received ' + SolveSize(B.T2F),
 								'Created ' + WW.StrDate(B.Birth) +
 									' Connected ' + (null == B.Connected ? '-' :
 										'+' + (B.Connected < 1E3 + B.Birth ? B.Connected - B.Birth + 'ms' : WW.StrMS(B.Connected - B.Birth,true))) +
-									' Duration ' + WW.StrMS(B.Duration,true)
-							].join('\n'))
+									' Duration ' + WW.StrMS(B.Duration,true),
+								B.Err,
+							]).join('\n'))
 						}
 					}
 				}

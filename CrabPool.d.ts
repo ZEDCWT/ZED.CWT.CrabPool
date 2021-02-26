@@ -54,10 +54,19 @@ declare module CrabPoolNS
 			Link : DBLink
 
 			RecMax() : WishNS.Provider<number>
-			RecNew(Q : {Row : number,Birth : number,From : number,To : number,Req : string}) : AnyP
+			RecNew(Q :
+			{
+				Row : number
+				Birth : number
+				From : number
+				To : number
+				Req : string
+				Client : string
+			}) : AnyP
 			RecCon(Q : {Row : number,At : number}) : AnyP
 			RecRec(Q : {Row : number,Duration : number,F2T : number,T2F : number}) : AnyP
 			RecOff(Row : number) : AnyP
+			RecErr(Q : {Row : number,Err : string}) : AnyP
 			RecCount() : WishNS.Provider<number>
 			RecGet(Page : number,PageSize : number) : WishNS.Provider<Rec[]>
 

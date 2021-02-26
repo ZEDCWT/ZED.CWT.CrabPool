@@ -118,7 +118,7 @@ module.exports = Option =>
 	PipeMaster = Option.Pipe,
 	PipeRetry = Option.PipeRetry || 1E4,
 	PipeTimeout = Option.PipeTimeout || 3E5,
-	TickInterval = Option.Tick || 2E4,
+	TickInterval = Option.Tick || 6E4,
 	PathData = Option.Data || WN.JoinP(WN.Data,'ZED/CrabPool'),
 	PathLog = WN.JoinP(PathData,'Log'),
 	LogRoll,
@@ -689,7 +689,7 @@ module.exports = Option =>
 				Sec = null
 			}
 		};
-		Soc.on('error',WW.O)
+		Soc.on('error',E => null == E || OnRecErr({Row : ID,Err : String(E)}))
 			.on('close',() => Fin())
 			.on('data',Q =>
 			{
@@ -777,19 +777,25 @@ module.exports = Option =>
 	AuxOnPR = AuxOnPipe1(AuxPoolKeyPR),
 	AuxWaitRaw = (ID,From,Soc,SecExp,Link) =>
 	{
+		var
+		Fin = S =>
+		{
+			if ((!S || S === SecExp) && Soc)
+			{
+				EndSocket(Soc)
+				OnRecOff(ID)
+				AuxPool.delete(ID)
+				SecExp.OnFin(ID)
+				Soc =
+				SecExp =
+				Link = null
+			}
+		};
+		SecExp.OnFin(ID,Fin)
 		AuxPool.set(ID,
 		[
 			0,
-			S =>
-			{
-				if ((!S || S === SecExp) && Soc)
-				{
-					EndSocket(Soc)
-					OnRecOff(ID)
-					AuxPool.delete(ID)
-					Soc = null
-				}
-			},
+			Fin,
 			(Sec,AuxID) => SecExp === Sec && AuxMakeRawPipe(ID,From,Soc,Sec,AuxID,Link),
 		])
 	},
@@ -1103,6 +1109,7 @@ module.exports = Option =>
 	OnRecCon = OnDB(null,DB.RecCon),
 	OnRecRec = OnDB(null,DB.RecRec),
 	OnRecOff = OnDB(null,DB.RecOff),
+	OnRecErr = OnDB(null,DB.RecErr),
 
 	OnStatRec = OnDB(null,DB.StatRec),
 
@@ -1463,6 +1470,7 @@ module.exports = Option =>
 					From : MachineRow,
 					To : Target,
 					Req,
+					Client : RemoteIP(S),
 				})
 				StatOnConn()
 				if (Target === MachineRow)

@@ -15,6 +15,7 @@ module.exports = Option =>
 	Run,
 	Get,
 	All,
+	Ignore = (...Q) => Run(...Q).FinErr(),
 	MakeDB = H => (...Q) => WX.P(O =>
 	{
 		H.call(DB,...Q,(E,R) =>
@@ -183,7 +184,9 @@ module.exports = Option =>
 					Val text
 				);
 				update Rec set Online = 0 where 0 <> Online;
-			`.replace(/^	{4}/mg,'').trim())),
+			`.replace(/^	{4}/mg,'').trim()))
+			.FMap(() => Ignore(`alter table Rec add Client text`))
+			.FMap(() => Ignore(`alter table Rec add Err text`)),
 
 			PoolAll : () => All(`select * from Pool where 0 <> Enabled order by Row`),
 			PoolLst : Q => WX.Merge
@@ -256,8 +259,8 @@ module.exports = Option =>
 			Link : MakeLink('Link'),
 
 			RecMax : () => Get(`select max(Row) Max from Rec`).Map(B => B.Max),
-			RecNew : Q => Run(`insert into Rec values(?,9,?,null,null,?,?,?,null,null)`,
-				[Q.Row,Q.Birth,Q.From,Q.To,Q.Req]),
+			RecNew : Q => Run(`insert into Rec values(?,9,?,null,null,?,?,?,null,null,?,null)`,
+				[Q.Row,Q.Birth,Q.From,Q.To,Q.Req,Q.Client]),
 			RecCon : Q => Run(
 			`
 				update Rec set
@@ -276,6 +279,7 @@ module.exports = Option =>
 				where ? = Row
 			`,[Q.Duration,Q.F2T,Q.T2F,Q.Row]),
 			RecOff : Q => Run(`update Rec set Online = 0 where ? = Row`,[Q]),
+			RecErr : Q => Run(`update Rec set Err = ? where ? = Row`,[Q.Err,Q.Row]),
 			RecCount : () => Get('select count(*) Count from Rec').Map(B => B.Count),
 			RecGet : (Q,S) => All(
 			`
