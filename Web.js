@@ -1104,6 +1104,12 @@
 					}
 				}),
 
+				OnIP = function()
+				{
+					Identity.I(PoolData.IP ||
+						NodeIsMaster(PoolData) && NodeStatus.MasterIP ||
+						'::')
+				},
 				OnOF = function()
 				{
 					PoolDataOnline = PoolData.Online
@@ -1164,9 +1170,7 @@
 					},
 					Idx : function(Q,S)
 					{
-						Identity.I(PoolData.IP ||
-							NodeIsMaster(PoolData) && NodeStatus.MasterIP ||
-							'::')
+						OnIP()
 						WV.T(Index,
 							WR.PadU(Q,~-S) + ' / ' + S +
 							(NodeIsMaster(PoolData) ? ' Master' : '') +
@@ -1183,6 +1187,7 @@
 							++OnlineCount
 							OnCount()
 						}
+						OnIP()
 						OnOF()
 					},
 					Off : function()
