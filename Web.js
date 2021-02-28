@@ -33,6 +33,7 @@
 	OnTick = WW.BusS(),
 
 	SolveSize = function(Q){return null == Q ? '-' : WR.ToSize(Q) + ' (' + Q + ')'},
+	SolveSpeed = function(Q,S){return WR.ToSize(1E3 * Q / (S || 1)) + '/s'},
 
 	LogEnabled = false,
 	Log = function()
@@ -1431,11 +1432,14 @@
 									(B.Client ? ' (' + B.Client + ')' : ''),
 								'To ' + PoolShowRow(B.HostTo),
 								'Address ' + B.Req,
-								'Sent ' + SolveSize(B.F2T) + ' Received ' + SolveSize(B.T2F),
 								'Created ' + WW.StrDate(B.Birth) +
 									' Connected ' + (null == B.Connected ? '-' :
 										'+' + (B.Connected < 1E3 + B.Birth ? B.Connected - B.Birth + 'ms' : WW.StrMS(B.Connected - B.Birth,true))) +
 									' Duration ' + WW.StrMS(B.Duration,true),
+								'Sent ' + SolveSize(B.F2T) + ' Received ' + SolveSize(B.T2F) +
+									(null == B.Connected ? '' :
+										' Average ' + SolveSpeed(B.F2T,B.Duration) +
+										' ' + SolveSpeed(B.T2F,B.Duration)),
 								B.Err,
 							]).join('\n'))
 						}
