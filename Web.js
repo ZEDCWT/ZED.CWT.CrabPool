@@ -977,10 +977,7 @@
 			{
 				Hint : 'Token',
 				Pass : true,
-				Ent : function()
-				{
-					WSTouching || Connect()
-				}
+				Ent : Connect
 			}),
 			TokenEnt = WV.But(
 			{
@@ -991,7 +988,7 @@
 			}),
 			SaveNew = function()
 			{
-				if (WebSocketSend(Proto.TokenNew,
+				if (Online && WebSocketSend(Proto.TokenNew,
 				{
 					Old : StepA(Token.V()),
 					New : StepA(TokenNew.V()),
@@ -1006,10 +1003,7 @@
 			{
 				Hint : 'New Token',
 				Pass : true,
-				Ent : function()
-				{
-					Online
-				}
+				Ent : SaveNew
 			}).Off(),
 			TokenNewEnt = WV.But(
 			{
@@ -1123,6 +1117,7 @@
 						WV.ClsR(Del.On().R,WV.None)
 					Stat
 						.V(PoolData.Count)
+						.F(WW.StrDate(PoolData.LastOn))
 						.T(PoolDataOnline ? 'Now' : WW.StrDate(PoolData.LastOff))
 					OnPassed()
 				},
