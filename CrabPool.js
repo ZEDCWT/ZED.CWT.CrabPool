@@ -652,15 +652,16 @@ module.exports = Option =>
 	AuxMakePR = (Sec,AuxID,OnPR) =>
 	{
 		var
-		CurrentPaused = Sec.Paused,
+		CurrentPaused = Sec.Paused(),
 		NextPaused = false,
 		Paused = CurrentPaused || NextPaused,
 		OnChange = () =>
 		{
-			Paused === (Paused = CurrentPaused || NextPaused) &&
+			Paused === (Paused = CurrentPaused || NextPaused) ||
 				OnPR(Paused)
 		};
 		Sec.OnPR(AuxID,P => OnChange(CurrentPaused = P))
+		Paused && OnPR(Paused)
 		return [
 			() => Sec.OnPR(AuxID),
 			P => OnChange(NextPaused = P),
@@ -1296,7 +1297,7 @@ module.exports = Option =>
 				}),
 				[Proto.AuxFin] : WithInit(Data => AuxOnFin(Sec,Data.ID)),
 				[Proto.AuxEnd] : WithInit(Data => AuxOnEnd(Sec,Data.ID)),
-				[Proto.AuxPR] : WithInit(Data => AuxOnPR(Sec,Data.ID)),
+				[Proto.AuxPR] : WithInit(Data => AuxOnPR(Sec,Data.ID,Data.Pause)),
 
 				[Proto.ExtSet] : WithInit(OnExtSet),
 			}),AuxOnData);
@@ -1335,6 +1336,11 @@ module.exports = Option =>
 			Log = MakeLog(LogPrefix),
 			HelloSeed = MakeSeed(),
 			OnLinkGlobal = H => Data => Data.IsGlobal && H(Data),
+			PingTooLong = WW.TOD(2 * TickInterval,() =>
+			{
+				Log('No Ping')
+				MakeNoise(Sec)
+			}),
 			Sec = NodeMasterSec = MakeSec(S,MakeProtoAct(ProtoDec,
 			{
 				[Proto.Fatal] : Data => Log('Fatal',Data.Msg),
@@ -1352,9 +1358,14 @@ module.exports = Option =>
 					Sec.O(Proto.Hello,{Ack : Data.Syn})
 					WebBroadcast(Proto.NodeStatus,NodeStatus)
 					Sec.Pool(PoolMapRow[NodeStatus.Master])
+					PingTooLong.D()
 					Log('Authed')
 				},
-				[Proto.Ping] : Data => Sec.O(Proto.Ping,Data),
+				[Proto.Ping] : Data =>
+				{
+					Sec.O(Proto.Ping,Data)
+					PingTooLong.D()
+				},
 
 				[Proto.Wish] : Data =>
 				{
@@ -1378,7 +1389,7 @@ module.exports = Option =>
 				[Proto.Take] : Data => AuxOnWaitTake(Sec,Data.From,Data.To),
 				[Proto.AuxFin] : Data => AuxOnFin(Sec,Data.ID),
 				[Proto.AuxEnd] : Data => AuxOnEnd(Sec,Data.ID),
-				[Proto.AuxPR] : Data => AuxOnPR(Sec,Data.ID),
+				[Proto.AuxPR] : Data => AuxOnPR(Sec,Data.ID,Data.Pause),
 
 
 
@@ -1413,6 +1424,7 @@ module.exports = Option =>
 				NodeOnline =
 				NodeStatus.Online = false
 				WebBroadcast(Proto.NodeStatus,NodeStatus)
+				PingTooLong.F()
 				O.E()
 			})
 			Log('Created')
