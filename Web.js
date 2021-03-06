@@ -894,7 +894,11 @@
 			Off : Dispatch('Off'),
 			Con : Dispatch('Con'),
 			Dis : Dispatch('Dis'),
-			Mod : Dispatch('Mod'),
+			Mod : function(Q)
+			{
+				Dispatch('Mod')(Q)
+				OnIndex()
+			},
 			Del : function(Q)
 			{
 				var C = CardRow[Q.Row];
