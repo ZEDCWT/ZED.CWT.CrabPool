@@ -438,10 +438,11 @@ module.exports = Option =>
 					MakeSocHeaderBuf[F - 1] |= 128
 				for (T = ID + Data.length;T = (T - (MakeSocHeaderBuf[F++] = T % 128)) / 128;)
 					MakeSocHeaderBuf[F - 1] |= 128
-				// We copy the buffer here to prevent rewrting a queued one
-				MakeSocHeaderBuf.copy(T = Buffer.allocUnsafe(F))
-				Soc.write(C(T))
-				if (!Soc.write(Enc ? C(Data) : Data) && !Paused)
+				if (!Soc.write(Buffer.concat(
+				[
+					C(MakeSocHeaderBuf.slice(0,F)),
+					Enc ? C(Data) : Data
+				])) && !Paused)
 				{
 					Paused = true
 					OnPR.forEach(V => V(true))
@@ -1177,7 +1178,8 @@ module.exports = Option =>
 					if (Preparing)
 					{
 						Inited = true
-						Data.Ack === HelloSeed ||
+						Data.Ack === HelloSeed ?
+							Ping.C() :
 							Sec.F(`Ack failure ${HelloSeed} ${Data.Ack}`)
 						return
 					}
@@ -1236,7 +1238,6 @@ module.exports = Option =>
 						Syn : HelloSeed,
 						Ack : Data.Syn,
 					})
-					Ping.C()
 
 					Sec.Pool(PoolData)
 
