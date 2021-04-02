@@ -683,22 +683,29 @@ module.exports = Option =>
 				AuxPool.delete(ID)
 				PR[AuxPRKeyFin]()
 				Rec[AuxMakeRecKeyFin]()
+				Listener.forEach(V => Soc.off(...V))
 				Sec.OnFin(ID)
 				PR =
 				Rec =
+				Listener =
 				Soc =
 				Sec = null
 			}
-		};
-		Soc.on('error',E => null == E || OnRecErr({Row : ID,Err : String(E)}))
-			.on('close',() => Fin())
-			.on('data',Q =>
+		},
+		// https://github.com/nodejs/node/issues/38034
+		Listener = WR.SplitAll(2,
+		[
+			'error',E => null == E || OnRecErr({Row : ID,Err : String(E)}),
+			'close',() => Fin(),
+			'data',Q =>
 			{
 				Rec[AuxMakeRecKeyIO](RawIsFrom ? 0 : 1,Q.length)
 				AuxPipeData(Sec,AuxID,C(Q))
-			})
-			.on('end',() => AuxPipeEnd(Sec,AuxID))
-			.on('drain',() => AuxPipePR(Sec,AuxID,Paused = false))
+			},
+			'end',() => AuxPipeEnd(Sec,AuxID),
+			'drain',() => AuxPipePR(Sec,AuxID,Paused = false),
+		]);
+		Listener.forEach(V => Soc.on(...V))
 		Sec.OnFin(ID,Fin)
 		AuxPool.set(ID,
 		[
