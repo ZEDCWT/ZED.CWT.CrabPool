@@ -1692,6 +1692,8 @@ module.exports = Option =>
 				Err('Unable to edit GlobalLink')
 			else H(Data)
 		},
+		EndRec = WX.EndL(),
+		EndStat = WX.EndL(),
 		Act = MakeProtoAct(ProtoDec,
 		{
 			[Proto.Hello] : Data =>
@@ -1759,10 +1761,10 @@ module.exports = Option =>
 				if (100 < PageSize)
 					return Err('PageSize too huge')
 
-				DB.RecCount().FMap(Count =>
+				EndRec(DB.RecCount().FMap(Count =>
 					DB.RecGet(Page,PageSize).Tap(Rec =>
 						Send(Proto.RecRes,{Count,Rec})))
-					.Now(null,E => Err(`Failed to load rec ${ErrorS(E)}`))
+					.Now(null,E => Err(`Failed to load rec ${ErrorS(E)}`)))
 			}),
 			[Proto.RecCut] : WithInit(Data =>
 			{
@@ -1778,14 +1780,14 @@ module.exports = Option =>
 
 				Today -= TZ *= 6E4
 				Today -= Today % DayMS - TZ
-				DB.StatAfter(Today - 30 * DayMS)
+				EndStat(DB.StatAfter(Today - 30 * DayMS)
 					.Now(Stat =>
 					{
 						Send(Proto.StatRes,{Today,Stat})
 					},E =>
 					{
 						Err(`Failed to load stat ${ErrorS(E)}`)
-					})
+					}))
 			}),
 		});
 
