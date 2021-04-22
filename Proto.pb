@@ -1,12 +1,12 @@
 
-€ 
+Á#
 Proto.proto"
 Fatal
 Msg (	RMsg"
 Err
 Msg (	RMsg"
 Warn
-Msg (	RMsg"µ
+Msg (	RMsg"É
 Hello
 Sec (RSec
 Row (RRow
@@ -16,7 +16,8 @@
 VerNode (	RVerNode
 VerWish	 (	RVerWish
 VerPool
- (	RVerPool"
+ (	RVerPool
+Feat (	RFeat"
 Ping
 Seed (RSeed"
 Noise
@@ -55,14 +56,30 @@
 Port	 (RPort"*
 Take
 From (RFrom
-To (RTo"
+To (RTo"*
 AuxFin
-ID (RID"
+ID (RID
+Err (	RErr"
 AuxEnd
 ID (RID"-
 AuxPR
 ID (RID
-Pause (RPause"ª
+Pause (RPause"u
+WishR
+ID (RID
+Key (	RKey
+From (RFrom
+To (RTo
+Host (	RHost
+Port	 (RPort"9
+TakeR
+ID (RID
+Key (	RKey
+To (RTo"=
+Ind
+Seed (RSeed
+Row (RRow
+Key (	RKey"¼
 Link
 Row (RRow
 Online (ROnline
@@ -78,7 +95,8 @@
 T2F (RT2F
 Using (RUsing
 Deploy (RDeploy
-Err (	RErr"g
+Err (	RErr
+Ind (RInd"g
 LinkNew
 IsGlobal (RIsGlobal
 Local (RLocal
@@ -98,7 +116,11 @@
 Addr (	RAddr"7
 LinkDel
 IsGlobal (RIsGlobal
-Row (RRow")
+Row (RRow"I
+LinkInd
+IsGlobal (RIsGlobal
+Row (RRow
+Ind (RInd")
 Ext
 Key (	RKey
 Val (	RVal",
@@ -221,7 +243,11 @@ OnPoolPing
 IsGlobal (RIsGlobal
 Row (RRow
 Deploy (RDeploy
-Err (	RErr""
+Err (	RErr"K
+	OnLinkInd
+IsGlobal (RIsGlobal
+Row (RRow
+Ind (RInd""
 OnExtLst
 Ext (2.ExtRExt".
 OnExtSet

@@ -37,12 +37,16 @@ Proto =
 	AuxFin : 0x8420,
 	AuxEnd : 0x8422,
 	AuxPR : 0x8424,
+	WishR : 0x8440,
+	TakeR : 0x8442,
+	Ind : 0x8444,
 
 	LinkNew : 0x8600,
 	LinkOn : 0x8602,
 	LinkOff : 0x8604,
 	LinkMod : 0x8606,
 	LinkDel : 0x8608,
+	LinkInd : 0x860A,
 
 	ExtSet : 0x8800,
 
@@ -78,6 +82,7 @@ Proto =
 	OnLinkDel : 0xCC4E,
 	OnLinkRec : 0xCC60,
 	OnLinkDep : 0xCC62,
+	OnLinkInd : 0xCC64,
 
 	OnExtLst : 0xCC80,
 	OnExtSet : 0xCC82,
@@ -131,6 +136,11 @@ module.exports = Option =>
 	DataSession = WN.JSON(WN.JoinP(PathData,'Session')),
 	DataSessionKeyNodeStatus = 'Node',
 
+	FeatureInd = 'Ind',
+	Feature =
+	[
+		FeatureInd,
+	],
 	MachineIDSec,
 	MachineIDSecHEX,
 	MachineIDHEX,
@@ -138,6 +148,7 @@ module.exports = Option =>
 	NodeStatus = {},
 	WebToken,
 	MakeSeed = () => WW.Rnd(0x4000000000000),
+	MakeSeedBuf = () => Crypto.randomBytes(WW.Rnd(1,256)),
 	MakeCount = (Q = 0) => () => WR.PadS0(4,Q++),
 	MakeTime = (Q = WW.Now()) => () => WW.StrMS(WW.Now() - Q),
 	MakeCD = H => H ?
@@ -146,9 +157,10 @@ module.exports = Option =>
 	MakeCipher = MakeCD(Cipher),
 	MakeDecipher = MakeCD(Decipher),
 	MakePipeMasterCount = MakeCount(),
-	MakePipeMaster = H => WX.Just()
-		.FMap(() => WX.Any(PipeMaster(MakeLog(`Pipe ${MakePipeMasterCount()}`))))
-		.FMap(S => WX.P(O => H(S,O))),
+	MakePipeMaster = /**@type {(H : (S : import('net').Socket,O : WishNS.DEF<any>) => any,U? : boolean) => WishNS.Provider<any>}*/
+		(H,U) => WX.Just()
+			.FMap(() => WX.Any(PipeMaster(MakeLog(`Pipe ${MakePipeMasterCount()}`),U)))
+			.FMap(S => WX.P(O => H(S,O))),
 
 	ListRowFind = (List,Q) => WW.BSL(List,Q.Row,(Q,S) => Q.Row < S),
 	ListRowNew = (List,Q) =>
@@ -320,6 +332,7 @@ module.exports = Option =>
 			},
 			On : WithLS((L,S) => S.O(L.Online = true)),
 			Off : WithLS((L,S) => S.O(L.Online = false)),
+			Ind : WithLS((L,S,Q) => S.I(L.Ind = Q.Ind)),
 			Con : WithL((L,Q) =>
 			{
 				++L.Visit
@@ -405,6 +418,8 @@ module.exports = Option =>
 	MakeSec = (Soc,OnProto,OnAux) =>
 	{
 		var
+		Online = true,
+		Feat,Raw,
 		C = MakeCipher(),D = MakeDecipher(),
 
 		PoolData,PoolIn = 0,PoolOut = 0,
@@ -432,17 +447,25 @@ module.exports = Option =>
 			if (Soc.writable)
 			{
 				var T,F = 0;
-				for (T = Data.length;T = (T - (MakeSocHeaderBuf[F++] = T % 128)) / 128;)
-					MakeSocHeaderBuf[F - 1] |= 128
-				for (T = ID;T = (T - (MakeSocHeaderBuf[F++] = T % 128)) / 128;)
-					MakeSocHeaderBuf[F - 1] |= 128
-				for (T = ID + Data.length;T = (T - (MakeSocHeaderBuf[F++] = T % 128)) / 128;)
-					MakeSocHeaderBuf[F - 1] |= 128
-				if (!Soc.write(Buffer.concat(
-				[
-					C(MakeSocHeaderBuf.slice(0,F)),
-					Enc ? C(Data) : Data
-				])) && !Paused)
+				if (Raw)
+				{
+					T = Enc ? C(Data) : Data
+				}
+				else
+				{
+					for (T = Data.length;T = (T - (MakeSocHeaderBuf[F++] = T % 128)) / 128;)
+						MakeSocHeaderBuf[F - 1] |= 128
+					for (T = ID;T = (T - (MakeSocHeaderBuf[F++] = T % 128)) / 128;)
+						MakeSocHeaderBuf[F - 1] |= 128
+					for (T = ID + Data.length;T = (T - (MakeSocHeaderBuf[F++] = T % 128)) / 128;)
+						MakeSocHeaderBuf[F - 1] |= 128
+					T = Buffer.concat(
+					[
+						C(MakeSocHeaderBuf.slice(0,F)),
+						Enc ? C(Data) : Data
+					])
+				}
+				if (!Soc.write(T) && !Paused)
 				{
 					Paused = true
 					OnPR.forEach(V => V(true))
@@ -470,6 +493,8 @@ module.exports = Option =>
 			return More
 		},
 
+		Ind = {},
+
 		R =
 		{
 			D : TOD.D,
@@ -484,26 +509,76 @@ module.exports = Option =>
 				EndSocket(Soc)
 			},
 			Fat : '',
-			Pool : P => PoolData = P,
+			Pool : P => null == P ?
+				PoolData :
+				PoolData = P,
+			Feat : Q => Feat ?
+				Feat.has(Q) :
+				Feat = new Set(Q || []),
 			Paused : () => Paused,
 			OnPR : (ID,PR) => PR ? OnPR.set(ID,PR) : OnPR.delete(ID),
 			OnFin : (ID,Fin) => Fin ? OnFin.set(ID,Fin) : OnFin.delete(ID),
+			S : Soc,
+			Raw : AuxID =>
+			{
+				Raw = AuxID
+				Soc.on('end',() => AuxOnEnd(R,AuxID))
+			},
+			Ind : (K,V) =>
+			{
+				var
+				RecErr,
+				Key;
+				if (WW.IsFunc(V))
+				{
+					RecErr = AuxMakeRecErr(K)
+					Key = Crypto.randomBytes(16).toString('HEX');
+					Ind[Key] = V
+					AuxPool.set(K,
+					[
+						false,
+						(_,E) =>
+						{
+							if (RecErr)
+							{
+								OnRecOff(K)
+								AuxPool.delete(K)
+								WR.Del(Key,V)
+								RecErr[AuxMakeRecErrKeyRec](E)
+								RecErr = null
+							}
+						}
+					])
+				}
+				else if (Key = Ind[K])
+				{
+					WR.Del(K,Ind)
+					Key(V)
+				}
+				return Key
+			},
+			IndHas : K => WR.Has(K,Ind),
 		};
 
 		Soc
 			.on('close',() =>
 			{
-				[...OnFin.values()].forEach(V => V())
+				[...OnFin.values()].forEach(V => V(null,'Pipe Closed'))
 				PoolRecSave()
 				PoolData = null
 			})
 			.on('data',Q =>
 			{
-				Wait.U(Q)
 				StatOnIn(Q.length)
 				PoolIn += Q.length
 				PoolData && PoolOnRec()
-				for (;Q;)
+				if (Raw)
+				{
+					OnAux(R,Raw,Q)
+					return
+				}
+				Wait.U(Q)
+				for (;Online && !Raw && Q;)
 					if (0 === State)
 					{
 						if (Q = !ReadUV())
@@ -547,6 +622,8 @@ module.exports = Option =>
 							OnProto(R,StateID,D(Q))
 						State = 0
 					}
+				Online && Raw &&
+					Wait.C() && OnAux(R,Raw,Wait.R())
 			})
 			.on('drain',() =>
 			{
@@ -557,7 +634,7 @@ module.exports = Option =>
 	},
 	MakeNoise = Sec =>
 	{
-		Sec.O(Proto.Noise,{Seed : Buffer.from(WR.Times(() => WW.Rnd(256),WW.Rnd(1,256)))})
+		Sec.O(Proto.Noise,{Seed : MakeSeedBuf()})
 	},
 
 
@@ -569,13 +646,21 @@ module.exports = Option =>
 	AuxPoolKeyEnd = 3,
 	AuxPoolKeyPR = 4,
 	AuxPoolKeyWaitTake = 2,
-	AuxPipeFin = (Sec,AuxID) => Sec.O(Proto.AuxFin,{ID : AuxID}),
-	AuxPipeData = (Sec,AuxID,Data) => Sec.P(AuxID,Data),
-	AuxPipeEnd = (Sec,AuxID) => Sec.O(Proto.AuxEnd,{ID : AuxID}),
-	AuxPipePR = (Sec,AuxID,Pause) => Sec.O(Proto.AuxPR,{ID : AuxID,Pause}),
+	AuxPipeFin = (Sec,AuxID,Err) => AuxID ?
+		Sec.O(Proto.AuxFin,{ID : AuxID,Err}) :
+		EndSocket(Sec.S),
+	AuxPipeData = (Sec,AuxID,Data) => AuxID ?
+		Sec.P(AuxID,Data) :
+		Sec.P(0,Data),
+	AuxPipeEnd = (Sec,AuxID) => AuxID ?
+		Sec.O(Proto.AuxEnd,{ID : AuxID}) :
+		Sec.S.end(),
+	AuxPipePR = (Sec,AuxID,Pause) => AuxID ?
+		Sec.O(Proto.AuxPR,{ID : AuxID,Pause}) :
+		Pause ? Sec.S.pause() : Sec.S.resume(),
 	AuxMakeRecKeyFin = 0,
 	AuxMakeRecKeyIO = 1,
-	AuxMakeRec = (ID,From,Link) =>
+	AuxMakeRec = (ID,Begin,Link) =>
 	{
 		var
 		IO = [0,0],IOLink = [0,0],
@@ -584,7 +669,7 @@ module.exports = Option =>
 			OnRecRec(
 			{
 				Row : ID,
-				Duration : WW.Now() - From,
+				Duration : WW.Now() - Begin,
 				F2T : IO[0],
 				T2F : IO[1],
 			})
@@ -616,15 +701,42 @@ module.exports = Option =>
 			},
 		]
 	},
-	AuxMakeRaw = (Host,Port) => Net.createConnection({host : Host,port : Port}),
-	AuxMakeRawRaw = (ID,From,SocQ,SocS,IsGlobal,Row) =>
+	AuxMakeRecErrSideClient = 0,
+	AuxMakeRecErrSideServer = 1,
+	AuxMakeRecErrKeyRec = 0,
+	AuxMakeRecErrKeyErr = 1,
+	AuxMakeRecErr = ID =>
 	{
 		var
-		Rec = AuxMakeRec(ID,From),
-		Fin = S =>
+		Online = true,
+		Err = null;
+		return [
+			(E,S) =>
+			{
+				if (Online)
+				{
+					Online = false
+					if (E)
+					{
+						Err = null == S ? E : `${S ? 'Server' : 'Client'} | ${E}`
+						OnRecErr({Row : ID,Err})
+					}
+				}
+			},
+			() => Err
+		]
+	},
+	AuxMakeRaw = (Host,Port) => Net.createConnection({host : Host,port : Port}),
+	AuxMakeRawRaw = (ID,Begin,SocQ,SocS,IsGlobal,Row) =>
+	{
+		var
+		Rec = AuxMakeRec(ID,Begin,[IsGlobal,Row]),
+		RecErr = AuxMakeRecErr(ID),
+		Fin = (S,E) =>
 		{
 			if (!S && SocQ)
 			{
+				RecErr[AuxMakeRecErrKeyRec](E)
 				EndSocket(SocQ)
 				EndSocket(SocS)
 				AuxPool.delete(ID)
@@ -635,11 +747,13 @@ module.exports = Option =>
 				SocS = null
 			}
 		};
-		SocQ.on('error',WW.O)
+		SocQ.on('error',E => RecErr[AuxMakeRecErrKeyRec](E,AuxMakeRecErrSideClient))
 			.on('close',() => Fin())
+			.on('data',Q => Rec && Rec[AuxMakeRecKeyIO](0,Q.length))
 			.pipe(SocS)
-		SocS.on('error',WW.O)
+		SocS.on('error',E => RecErr[AuxMakeRecErrKeyRec](E,AuxMakeRecErrSideServer))
 			.on('close',() => Fin())
+			.on('data',Q => Rec && Rec[AuxMakeRecKeyIO](1,Q.length))
 			.pipe(SocQ)
 		AuxPool.set(ID,
 		[
@@ -668,19 +782,23 @@ module.exports = Option =>
 			P => OnChange(NextPaused = P),
 		]
 	},
-	AuxMakeRawPipe = (ID,From,Soc,Sec,AuxID,RawIsFrom) =>
+	AuxMakeRawPipe = (ID,Begin,Soc,Sec,AuxID,RawIsFrom) =>
 	{
 		var
 		C = MakeCipher(),D = MakeDecipher(),
 		PR = AuxMakePR(Sec,AuxID,P => P ? Soc.pause() : Soc.resume()),
-		Rec = AuxMakeRec(ID,From,RawIsFrom),
+		Rec = AuxMakeRec(ID,Begin,RawIsFrom),
+		RecErr = AuxMakeRecErr(ID),
 		Paused = false,
-		Fin = S =>
+		Fin = (S,E) =>
 		{
 			if ((!S || S === Sec) && Sec)
 			{
+				RecErr[AuxMakeRecErrKeyRec](E,S === Sec ?
+					RawIsFrom ? AuxMakeRecErrSideServer : AuxMakeRecErrSideClient :
+					null)
 				EndSocket(Soc)
-				AuxPipeFin(Sec,AuxID)
+				S === Sec || AuxPipeFin(Sec,AuxID,RecErr[AuxMakeRecErrKeyErr]())
 				AuxPool.delete(ID)
 				PR[AuxPRKeyFin]()
 				Rec[AuxMakeRecKeyFin]()
@@ -696,7 +814,8 @@ module.exports = Option =>
 		// https://github.com/nodejs/node/issues/38034
 		Listener = WR.SplitAll(2,
 		[
-			'error',E => null == E || OnRecErr({Row : ID,Err : String(E)}),
+			'error',E => RecErr[AuxMakeRecErrKeyRec](E,
+				RawIsFrom ? AuxMakeRecErrSideClient : AuxMakeRecErrSideServer),
 			'close',() => Fin(),
 			'data',Q =>
 			{
@@ -726,18 +845,23 @@ module.exports = Option =>
 		])
 		OnRecCon({Row : ID,At : WW.Now()})
 	},
-	AuxMakePipePipe = (ID,From,SecQ,AuxIDQ,SecS,AuxIDS) =>
+	AuxMakePipePipe = (ID,Begin,SecQ,AuxIDQ,SecS,AuxIDS) =>
 	{
 		var
 		PRQ = AuxMakePR(SecQ,AuxIDQ,P => AuxPipePR(SecS,AuxIDS,P)),
 		PRS = AuxMakePR(SecS,AuxIDS,P => AuxPipePR(SecQ,AuxIDQ,P)),
-		Rec = AuxMakeRec(ID,From),
-		Fin = S =>
+		Rec = AuxMakeRec(ID,Begin),
+		RecErr = AuxMakeRecErr(ID),
+		Fin = (S,E) =>
 		{
 			if ((!S || S === SecQ || S === SecS) && SecQ)
 			{
-				AuxPipeFin(SecQ,AuxIDQ)
-				AuxPipeFin(SecS,AuxIDS)
+				RecErr[AuxMakeRecErrKeyRec](E,
+					S === SecQ ? AuxMakeRecErrSideClient :
+					S === SecS ? AuxMakeRecErrSideServer :
+					null)
+				S === SecQ || AuxPipeFin(SecQ,AuxIDQ,RecErr[AuxMakeRecErrKeyErr]())
+				S === SecS || AuxPipeFin(SecS,AuxIDS,RecErr[AuxMakeRecErrKeyErr]())
 				AuxPool.delete(ID)
 				PRQ[AuxPRKeyFin]()
 				PRS[AuxPRKeyFin]()
@@ -777,20 +901,25 @@ module.exports = Option =>
 		])
 		OnRecCon({Row : ID,At : WW.Now()})
 	},
-	AuxOnAny0 = H => (Sec,AuxID) => (AuxID = AuxPool.get(AuxID)) && AuxID[H](Sec),
+	AuxOnAny1 = H => (Sec,AuxID,Q) => (AuxID = AuxPool.get(AuxID)) && AuxID[H](Sec,Q),
 	AuxOnPipe0 = H => (Sec,AuxID) => (AuxID = AuxPool.get(AuxID)) && AuxID[AuxPoolKeyIsPipe] && AuxID[H](Sec),
 	AuxOnPipe1 = H => (Sec,AuxID,Q) => (AuxID = AuxPool.get(AuxID)) && AuxID[AuxPoolKeyIsPipe] && AuxID[H](Sec,Q),
-	AuxOnFin = AuxOnAny0(AuxPoolKeyFin),
+	AuxOnFin = AuxOnAny1(AuxPoolKeyFin),
 	AuxOnData = AuxOnPipe1(AuxPoolKeyData),
 	AuxOnEnd = AuxOnPipe0(AuxPoolKeyEnd),
 	AuxOnPR = AuxOnPipe1(AuxPoolKeyPR),
-	AuxWaitRaw = (ID,From,Soc,SecExp,Link) =>
+	AuxWaitSecExpCheck = (Ind,Exp,Sec) => Ind ?
+		Exp.Pool().Row === Sec.Pool().Row:
+		Exp === Sec,
+	AuxWaitRaw = (ID,Begin,Soc,SecExp,Link,Ind) =>
 	{
 		var
-		Fin = S =>
+		RecErr = AuxMakeRecErr(ID),
+		Fin = (S,E) =>
 		{
 			if ((!S || S === SecExp) && Soc)
 			{
+				RecErr[AuxMakeRecErrKeyRec](E,S === SecExp ? AuxMakeRecErrSideServer : null)
 				EndSocket(Soc)
 				OnRecOff(ID)
 				AuxPool.delete(ID)
@@ -805,17 +934,23 @@ module.exports = Option =>
 		[
 			0,
 			Fin,
-			(Sec,AuxID) => SecExp === Sec && AuxMakeRawPipe(ID,From,Soc,Sec,AuxID,Link),
+			(Sec,AuxID) => AuxWaitSecExpCheck(Ind,SecExp,Sec) &&
+				AuxMakeRawPipe(ID,Begin,Soc,Sec,AuxID,Link),
 		])
 	},
-	AuxWaitPipe = (ID,From,SecQ,AuxIDQ,SecExp) =>
+	AuxWaitPipe = (ID,Begin,SecQ,AuxIDQ,SecExp,Ind) =>
 	{
 		var
-		Fin = S =>
+		RecErr = AuxMakeRecErr(ID),
+		Fin = (S,E) =>
 		{
-			if ((!S || S === SecExp) && SecQ)
+			if ((!S || S === SecQ || S === SecExp) && SecQ)
 			{
-				AuxPipeFin(SecQ,AuxIDQ)
+				RecErr[AuxMakeRecErrKeyRec](E,
+					S === SecQ ? AuxMakeRecErrSideClient :
+					S === SecExp ? AuxMakeRecErrSideServer :
+					null)
+				S === SecQ || AuxPipeFin(SecQ,AuxIDQ,RecErr[AuxMakeRecErrKeyErr]())
 				AuxPool.delete(ID)
 				SecQ.OnFin(ID)
 				SecQ = null
@@ -828,10 +963,10 @@ module.exports = Option =>
 			Fin,
 			(SecS,AuxIDS) =>
 			{
-				if (SecExp === SecS)
+				if (AuxWaitSecExpCheck(Ind,SecExp,SecS))
 				{
 					SecQ.O(Proto.Take,{From : AuxIDQ,To : ID})
-					AuxMakePipePipe(ID,From,SecQ,AuxIDQ,SecS,AuxIDS)
+					AuxMakePipePipe(ID,Begin,SecQ,AuxIDQ,SecS,AuxIDS)
 				}
 			},
 		])
@@ -841,6 +976,8 @@ module.exports = Option =>
 		AuxID = AuxPool.get(AuxID)
 		if (AuxID && 0 === AuxID[AuxPoolKeyIsPipe])
 			AuxID[AuxPoolKeyWaitTake](Sec,Q)
+		else
+			AuxPipeFin(Sec,Q,'No Such Aux')
 	},
 
 
@@ -1069,6 +1206,7 @@ module.exports = Option =>
 	OnLinkMod = OnDBLink(true,Proto.OnLinkMod,'Mod'),
 	OpLinkMod = (Sec,Data) => OpLinkCheck(Sec,Data) && OnLinkMod(Data),
 	OnLinkDel = OnDBLink(true,Proto.OnLinkDel,'Del'),
+	OnLinkInd = OnDBLink(true,Proto.OnLinkInd,'Ind'),
 	OnLinkRec = OnDBLink(false,Proto.OnLinkRec,'Rec'),
 	OpLinkRecPrev = [{},{}],
 	OpLinkRec = (IsGlobal,Row,F2T,T2F) =>
@@ -1156,6 +1294,7 @@ module.exports = Option =>
 			var
 			Time = MakeTime(),
 			Log = MakeLog(`Master [${Count()}] ${RemoteIP(S)}`),
+			HelloData,
 			HelloSeed = MakeSeed(),
 			Inited,Preparing,
 			Row,PoolData,
@@ -1178,16 +1317,56 @@ module.exports = Option =>
 					if (Preparing)
 					{
 						Inited = true
-						Data.Ack === HelloSeed ?
-							Ping.C() :
-							Sec.F(`Ack failure ${HelloSeed} ${Data.Ack}`)
+						if (Data.Ack !== HelloSeed) return Sec.F(`Ack failure ${HelloSeed} ${Data.Ack}`)
+
+						MasterOnline.has(Row) &&
+							MasterOnline.get(Row).F('Kicked by ' + RemoteIP(S))
+						OnPoolOn(
+						{
+							Row,
+							IP : RemoteIP(S),
+							At : WW.Now(),
+							VN : HelloData.VerNode,
+							VW : HelloData.VerWish,
+							VP : HelloData.VerPool,
+						})
+						MasterOnline.set(Row,Sec)
+
+						Sec.O(Proto.OnPoolLst,{Pool : PoolList.map(V => (
+						{
+							...V,
+							F2T : 0,
+							T2F : 0,
+						}))})
+						Sec.O(Proto.OnLinkLst,
+						{
+							IsGlobal : 9,
+							Link : LinkGlobal.All().map(V => (
+							{
+								...V,
+								Online : 9,
+								Visit : 0,
+								Last : null,
+								F2T : 0,
+								T2F : 0,
+							}))
+						})
+						Sec.O(Proto.OnExtLst,{Ext : ExtGetLst()})
+
+						Sec.Pool(PoolData)
+						Sec.Feat(HelloData.Feat)
+						Ping.C()
 						return
 					}
+
 					Preparing = true
+					HelloData = Data
 
 					IDSec = Data.Sec
 					if (!IDSec) return Sec.F('Unnamed')
 					if (MachineIDSecHEX === WC.HEXS(IDSec)) return Sec.F('Not unique')
+
+					IDSec = HelloData.Sec
 					IDSec = WC.HEXS(StepB(IDSec))
 					PoolData = PoolMapID[IDSec]
 					if (!PoolData)
@@ -1196,50 +1375,15 @@ module.exports = Option =>
 						PoolData = PoolMapRow[PoolID]
 					}
 					Row = PoolData.Row
-					if (MasterOnline.has(Row))
-					{
-						MasterOnline.get(Row).F('Kicked by ' + RemoteIP(S))
-					}
-					OnPoolOn(
-					{
-						Row,
-						IP : RemoteIP(S),
-						At : WW.Now(),
-						VN : Data.VerNode,
-						VW : Data.VerWish,
-						VP : Data.VerPool,
-					})
-					MasterOnline.set(Row,Sec)
 
-					Sec.O(Proto.OnPoolLst,{Pool : PoolList.map(V => (
-					{
-						...V,
-						F2T : 0,
-						T2F : 0,
-					}))})
-					Sec.O(Proto.OnLinkLst,
-					{
-						IsGlobal : 9,
-						Link : LinkGlobal.All().map(V => (
-						{
-							...V,
-							Online : 9,
-							Visit : 0,
-							Last : null,
-							F2T : 0,
-							T2F : 0,
-						}))
-					})
-					Sec.O(Proto.OnExtLst,{Ext : ExtGetLst()})
 					Sec.O(Proto.Hello,
 					{
 						Row,
 						Master : MachineRow,
 						Syn : HelloSeed,
 						Ack : Data.Syn,
+						Feat : Feature,
 					})
-
-					Sec.Pool(PoolData)
 
 					Log('Node',Row)
 				},
@@ -1263,13 +1407,13 @@ module.exports = Option =>
 
 				[Proto.Wish] : WithInit(Data =>
 				{
-					if (Data.To !== MachineRow && !MasterOnline.has(Data.To) ||
+					if (Data.To !== MachineRow && !WR.Has(Data.To,PoolMapRow) ||
 						null == Data.ID ||
 						Data.From == Data.To)
-					{
-						AuxPipeFin(Sec,Data.ID)
-						return
-					}
+						return AuxPipeFin(Sec,Data.ID,'Bad Wish')
+
+					if (Data.To !== MachineRow && !MasterOnline.has(Data.To))
+						return AuxPipeFin(Sec,Data.ID,'Target Offline')
 
 					var
 					AuxID = ++RecID,
@@ -1303,7 +1447,79 @@ module.exports = Option =>
 					if (null != Data.To)
 						AuxOnWaitTake(Sec,Data.From,Data.To)
 				}),
-				[Proto.AuxFin] : WithInit(Data => AuxOnFin(Sec,Data.ID)),
+				[Proto.WishR] : WithInit(Data =>
+				{
+					if (Data.To !== MachineRow && !WR.Has(Data.To,PoolMapRow) ||
+						null == Data.ID ||
+						Data.From == Data.To)
+						return AuxPipeFin(Sec,Data.ID,'Bad Wish')
+
+					if (Data.To !== MachineRow && !MasterOnline.has(Data.To))
+						return AuxPipeFin(Sec,Data.ID,'Target Offline')
+
+					var
+					AuxID = ++RecID,
+					At = WW.Now();
+
+					OnRecNew(
+					{
+						Row : AuxID,
+						Birth : At,
+						From : Data.From,
+						To : Data.To,
+						Req : SolveReq(Data.Host,Data.Port),
+					})
+					StatOnConn()
+					Sec.O(Proto.TakeR,
+					{
+						ID : Data.ID,
+						Key : Sec.Ind(AuxID,SecI =>
+						{
+							var SecS;
+							if (Data.To === MachineRow)
+							{
+								IndAccept(SecI,Sec,AuxID)
+								AuxMakeRawPipe(AuxID,At,AuxMakeRaw(Data.Host,Data.Port),SecI,null,false)
+							}
+							else if (SecS = MasterOnline.get(Data.To))
+							{
+								if (SecS.Feat(FeatureInd))
+								{
+									IndAccept(SecI,Sec,AuxID)
+									AuxWaitPipe(AuxID,At,SecI,Data.ID,SecS,true)
+									Data.ID = AuxID
+									Data.Key = SecS.Ind(AuxID,SecI =>
+									{
+										IndAccept(SecI,SecS,AuxID)
+										AuxOnWaitTake(SecI,AuxID,null)
+									})
+									SecS.O(Proto.WishR,Data)
+								}
+								else
+								{
+									AuxWaitPipe(AuxID,At,Sec,Data.ID,SecS)
+									Data.ID = AuxID
+									SecS.O(Proto.Wish,Data)
+								}
+							}
+							else
+							{
+								SecI.F('Target Offline')
+							}
+						}),
+					})
+				}),
+				[Proto.Ind] : Data =>
+				{
+					if (Preparing) return Sec.F('Why')
+					var
+					SecO = MasterOnline.get(Data.Row);
+					if (!SecO ||
+						!SecO.IndHas(Data.Key))
+						return Sec.F('Bad Ind')
+					SecO.Ind(Data.Key,Sec)
+				},
+				[Proto.AuxFin] : WithInit(Data => AuxOnFin(Sec,Data.ID,Data.Err)),
 				[Proto.AuxEnd] : WithInit(Data => AuxOnEnd(Sec,Data.ID)),
 				[Proto.AuxPR] : WithInit(Data => AuxOnPR(Sec,Data.ID,Data.Pause)),
 
@@ -1366,6 +1582,7 @@ module.exports = Option =>
 					Sec.O(Proto.Hello,{Ack : Data.Syn})
 					WebBroadcast(Proto.NodeStatus,NodeStatus)
 					Sec.Pool(PoolMapRow[NodeStatus.Master])
+					Sec.Feat(Data.Feat)
 					PingTooLong.D()
 					Log('Authed')
 				},
@@ -1395,7 +1612,60 @@ module.exports = Option =>
 					AuxMakeRawPipe(AuxID,At,AuxMakeRaw(Data.Host,Data.Port),Sec,Data.ID,false)
 				},
 				[Proto.Take] : Data => AuxOnWaitTake(Sec,Data.From,Data.To),
-				[Proto.AuxFin] : Data => AuxOnFin(Sec,Data.ID),
+				[Proto.WishR] : Data =>
+				{
+					var
+					AuxID = ++RecID,
+					At = WW.Now(),
+					RecErr = AuxMakeRecErr(AuxID);
+					OnRecNew(
+					{
+						Row : AuxID,
+						Birth : At,
+						From : Data.From,
+						To : Data.To,
+						Req : SolveReq(Data.Host,Data.Port),
+					})
+					StatOnConn()
+
+					MakeInd(AuxID,Data.Key).Now(S =>
+					{
+						IndAccept(S,Sec,AuxID)
+						AuxMakeRawPipe(AuxID,At,AuxMakeRaw(Data.Host,Data.Port),S,null,false)
+					},E =>
+					{
+						AuxPipeFin(Sec,Data.ID,`IndErr | ${E}`)
+					})
+					AuxPool.set(AuxID,
+					[
+						false,
+						(_,E) =>
+						{
+							if (RecErr)
+							{
+								OnRecOff(AuxID)
+								AuxPool.delete(AuxID)
+								RecErr[AuxMakeRecErrKeyRec](E)
+								RecErr = null
+							}
+						}
+					])
+				},
+				[Proto.TakeR] : Data =>
+				{
+					if (!AuxPool.has(Data.ID))
+						return AuxPipeFin(Sec,Data.To,'Bad Take')
+
+					MakeInd(Data.ID,Data.Key).Now(S =>
+					{
+						IndAccept(S,Sec,Data.ID)
+						AuxOnWaitTake(S,Data.ID,null)
+					},E =>
+					{
+						AuxPipeFin(Sec,Data.To,`IndErr | ${E}`)
+					})
+				},
+				[Proto.AuxFin] : Data => AuxOnFin(Sec,Data.ID,Data.Err),
 				[Proto.AuxEnd] : Data => AuxOnEnd(Sec,Data.ID),
 				[Proto.AuxPR] : Data => AuxOnPR(Sec,Data.ID,Data.Pause),
 
@@ -1414,6 +1684,7 @@ module.exports = Option =>
 				[Proto.OnLinkNew] : OnLinkGlobal(OnLinkNew),
 				[Proto.OnLinkMod] : OnLinkGlobal(OnLinkMod),
 				[Proto.OnLinkDel] : OnLinkGlobal(OnLinkDel),
+				[Proto.OnLinkInd] : OnLinkGlobal(OnLinkInd),
 
 				[Proto.OnExtLst] : OnExtLst,
 				[Proto.OnExtSet] : OnExtSet,
@@ -1444,8 +1715,34 @@ module.exports = Option =>
 				VerNode : process.versions.node,
 				VerWish : WW.Version,
 				VerPool : PoolVersion,
+				Feat : Feature,
 			})
 		}).RetryWhen(E => E.Delay(PipeRetry)).Now()
+	},
+
+
+
+	MakeInd = (AuxID,Key) => MakePipeMaster((S,O) =>
+	{
+		var
+		Sec = MakeSec(S,MakeProtoAct(ProtoDec,
+		{
+			[Proto.Fatal] : Data => AuxOnFin(null,AuxID,Data.Msg),
+			[Proto.Ind] : () => O.U(Sec),
+		}),AuxOnData);
+		S.on('error',E => AuxOnFin(null,AuxID,E))
+		Sec.O(Proto.Ind,
+		{
+			Seed : MakeSeedBuf(),
+			Row : MachineRow,
+			Key,
+		})
+	},true),
+	IndAccept = (SecI,Sec,AuxID) =>
+	{
+		SecI.Pool(Sec.Pool())
+		PipeMaster || SecI.O(Proto.Ind,{})
+		SecI.Raw(AuxID)
 	},
 
 
@@ -1457,6 +1754,7 @@ module.exports = Option =>
 		Log = MakeLog(`Link${IsGlobal ? 'Global' : ''} [${Row}]`),
 		Online,Paused = false,
 		Local,Target,Host,Port,Req,
+		Ind,
 		Server,ServerPort,
 		Renew,
 		Make = () =>
@@ -1471,6 +1769,7 @@ module.exports = Option =>
 				var
 				AuxID = ++RecID,
 				At = WW.Now(),
+				IndKey,
 				Fin = () =>
 				{
 					if (AuxID)
@@ -1479,6 +1778,8 @@ module.exports = Option =>
 						AuxOnFin(null,AuxID)
 						OnLinkDisconnect(IsGlobal,Row)
 						AuxID = null
+						IndKey && Sec.Ind(IndKey,null)
+						IndKey = null
 					}
 				},
 				Sec;
@@ -1504,15 +1805,35 @@ module.exports = Option =>
 					S.on('error',WW.O)
 						.on('close',Fin)
 					Sec = PipeMaster ? NodeMasterSec : MasterOnline.get(Target)
-					AuxWaitRaw(AuxID,At,S,Sec,[IsGlobal,Row])
-					Sec.O(Proto.Wish,
+					if (Ind && Sec.Feat(FeatureInd))
 					{
-						ID : AuxID,
-						From : MachineRow,
-						To : Target,
-						Host,
-						Port,
-					})
+						Sec.O(Proto.WishR,
+						{
+							ID : AuxID,
+							Key : PipeMaster ? null : IndKey = Sec.Ind(AuxID,SecI =>
+							{
+								IndAccept(SecI,Sec,AuxID)
+								IndKey = null
+								AuxOnWaitTake(SecI,AuxID,null)
+							}),
+							From : MachineRow,
+							To : Target,
+							Host,
+							Port,
+						})
+					}
+					else
+					{
+						Sec.O(Proto.Wish,
+						{
+							ID : AuxID,
+							From : MachineRow,
+							To : Target,
+							Host,
+							Port,
+						})
+					}
+					AuxWaitRaw(AuxID,At,S,Sec,[IsGlobal,Row],Ind)
 				}
 				else
 				{
@@ -1553,11 +1874,13 @@ module.exports = Option =>
 				Target = V.Target
 				Host = V.Host
 				Port = V.Port
+				Ind = V.Ind
 				Req = SolveReq(Host,Port)
 				Suppress || OnChange()
 			},
 			F : End,
 			O : On => OnChange(Online = On),
+			I : I => OnChange(Ind = I),
 			L : () => Local,
 			PR : P => OnChange(Paused = P)
 		}
@@ -1731,6 +2054,7 @@ module.exports = Option =>
 			[Proto.LinkOff] : WithInit(OnLinkOff),
 			[Proto.LinkMod] : WithInit(OnLink(Data => OpLinkMod(Sec,Data))),
 			[Proto.LinkDel] : WithInit(OnLink(OnLinkDel)),
+			[Proto.LinkInd] : WithInit(OnLink(OnLinkInd)),
 
 			[Proto.ExtSet] : WithInit(Forward(Proto.ExtSet,OnExtSet)),
 
@@ -1768,7 +2092,7 @@ module.exports = Option =>
 			}),
 			[Proto.RecCut] : WithInit(Data =>
 			{
-				AuxOnFin(null,Data.Row)
+				AuxOnFin(null,Data.Row,'Manually Cut')
 			}),
 			[Proto.StatReq] : WithInit(Data =>
 			{

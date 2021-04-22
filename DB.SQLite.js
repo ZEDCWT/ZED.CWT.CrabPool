@@ -47,7 +47,8 @@ module.exports = Option =>
 					(
 						?,9,?,?,
 						?,?,?,?,
-						?,?,?,?
+						?,?,?,?,
+						?
 					)
 				`,
 				[
@@ -62,11 +63,12 @@ module.exports = Option =>
 					V.Last,
 					V.F2T,
 					V.T2F,
+					V.Ind,
 				]
 			))
 		).Fin(),
 		Max : () => Get(`select max(Row) Max from ${H}`).Map(B => B.Max),
-		New : Q => Run(`insert into ${H} values(?,9,9,?,?,?,?,?,0,null,0,0)`,
+		New : Q => Run(`insert into ${H} values(?,9,9,?,?,?,?,?,0,null,0,0,0)`,
 			[Q.Row,Q.Birth,Q.Local,Q.Target,Q.Host,Q.Port]),
 		On : Q => Run(`update ${H} set Online = 9 where ? = Row and 0 = Online`,[Q.Row]),
 		Off : Q => Run(`update ${H} set Online = 0 where ? = Row and 0 <> Online`,[Q.Row]),
@@ -88,6 +90,7 @@ module.exports = Option =>
 		`,[Q.Local,Q.Target,Q.Host,Q.Port,Q.Row]),
 		Del : Q => Run(`update ${H} set Enabled = 0 where ? = Row`,[Q.Row]),
 		Rec : Q => Run(`update ${H} set F2T = F2T + ?,T2F = T2F + ? where ? = Row`,[Q.F2T,Q.T2F,Q.Row]),
+		Ind : Q => Run(`update ${H} set Ind = ? where ? = Row`,[Q.Ind ? 9 : 0,Q.Row]),
 	});
 
 	return {
@@ -185,8 +188,14 @@ module.exports = Option =>
 				);
 				update Rec set Online = 0 where 0 <> Online;
 			`.replace(/^	{4}/mg,'').trim()))
-			.FMap(() => Ignore(`alter table Rec add Client text`))
-			.FMap(() => Ignore(`alter table Rec add Err text`)),
+			.FP(WX.From(
+			[
+				['Rec','Client text'],
+				['Rec','Err text'],
+				['LinkGlobal','Ind integer'],
+				['Link','Ind integer'],
+			]).FMapO(1,([V,B]) => Ignore(`alter table ${V} add ${B}`))
+				.Fin()),
 
 			PoolAll : () => All(`select * from Pool where 0 <> Enabled order by Row`),
 			PoolLst : Q => WX.Merge

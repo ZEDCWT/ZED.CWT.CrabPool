@@ -34,6 +34,8 @@ message Hello
 	string VerNode = 8;
 	string VerWish = 9;
 	string VerPool = 10;
+
+	repeated string Feat = 15;
 }
 
 message Ping
@@ -107,6 +109,7 @@ message Take
 message AuxFin
 {
 	uint64 ID = 1;
+	string Err = 2;
 }
 
 message AuxEnd
@@ -118,6 +121,31 @@ message AuxPR
 {
 	uint64 ID = 1;
 	bool Pause = 2;
+}
+
+message WishR
+{
+	uint64 ID = 1;
+	string Key = 2;
+	uint64 From = 3;
+	uint64 To = 4;
+
+	string Host = 8;
+	uint32 Port = 9;
+}
+
+message TakeR
+{
+	uint64 ID = 1;
+	string Key = 2;
+	uint64 To = 3;
+}
+
+message Ind
+{
+	bytes Seed = 1;
+	uint64 Row = 2;
+	string Key = 3;
 }
 
 
@@ -141,6 +169,7 @@ message Link
 	uint64 Deploy = 13;
 	// Non DB field
 	string Err = 14;
+	uint64 Ind = 15;
 }
 
 message LinkNew
@@ -176,6 +205,13 @@ message LinkDel
 {
 	uint64 IsGlobal = 1;
 	uint64 Row = 2;
+}
+
+message LinkInd
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+	uint64 Ind = 3;
 }
 
 
@@ -395,6 +431,13 @@ message OnLinkDep
 	uint64 Row = 2;
 	uint64 Deploy = 3;
 	string Err = 4;
+}
+
+message OnLinkInd
+{
+	uint64 IsGlobal = 1;
+	uint64 Row = 2;
+	uint64 Ind = 3;
 }
 
 

@@ -8,7 +8,7 @@ declare module CrabPoolNS
 			Decipher?() : import('crypto').Cipher
 			PortMaster? : number
 			PortWeb? : number
-			Pipe?(Log : (...Q : any[]) => any) : import('net').Socket | WishNS.Provider<import('net').Socket>
+			Pipe?(Log : (...Q : any[]) => any,Independent : boolean) : import('net').Socket | WishNS.Provider<import('net').Socket>
 			PipeRetry? : number
 			Timeout? : number
 			Tick? : number
@@ -107,6 +107,7 @@ declare module CrabPoolNS
 		}) : AnyP
 		Del(Q : {Row : number}) : AnyP
 		Rec(Q : {Row : number,F2T : number,T2F : number}) : AnyP
+		Ind(Q : {Row : number,Ind : number}) : AnyP
 	}
 
 	interface Pool
@@ -142,6 +143,7 @@ declare module CrabPoolNS
 		Last? : number
 		F2T? : number
 		T2F? : number
+		Ind? : number
 		/** Non DB field */
 		Using? : number
 		/** Non DB field */

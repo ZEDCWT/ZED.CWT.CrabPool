@@ -77,7 +77,7 @@ You can also use it as an `Express.Router` and mount it to any path you like on 
 	+ `PortWeb` : `number` Optional. Port to deploy the Web Server.
 	+ `Pipe(Log)` Require for Nodes, must not be present for the Master. See [Example : Pipe][ExPipe]
 		+ `Log` : `(...Q : any[]) => any`. Write logs.
-		+ Returns : `Net.Socket | WishNS.Provider<Net.Socket>`
+		+ Returns : `import('net').Socket | WishNS.Provider<import('net').Socket>`
 	+ `PipeRetry` : `number` Optional. Default `1E4`ms. Interval to wait before connecting to the Master again after the previous connection closed.
 	+ `Timeout` : `number` Optional. Default `3E5`ms. Time to wait to shutdown an inactive connection.
 	+ `Tick` : `number` Optional. Default `6E4`ms. Heartbeat interval.

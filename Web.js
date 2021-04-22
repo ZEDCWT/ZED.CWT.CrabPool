@@ -230,6 +230,15 @@
 					L.Err = Q.Err
 					Panel.Dep(Q)
 				}
+			},
+			Ind : function(Q)
+			{
+				var L = Row[Q.Row];
+				if (L)
+				{
+					L.Ind = Q.Ind
+					Panel.Ind(Q)
+				}
 			}
 		}
 	},
@@ -502,6 +511,7 @@
 		Proto.OnLinkDel,OnLink('Del'),
 		Proto.OnLinkRec,OnLink('Rec'),
 		Proto.OnLinkDep,OnLink('Dep'),
+		Proto.OnLinkInd,OnLink('Ind'),
 
 		Proto.OnExtLst,function(Data)
 		{
@@ -558,7 +568,7 @@
 						if (NewCond()) U.On()
 						U.Drop(Q,function(S,_,Q)
 						{
-							return Q.test(S[0]) || Q.test(S[3])
+							return Q.test(S[1][0]) || Q.test(S[3])
 						})
 						U.V(V)
 					}
@@ -597,6 +607,21 @@
 					{
 						IsGlobal : IsGlobal,
 						Row : LinkData.Row
+					})
+				}
+			}),
+			Ind = WV.Cho(
+			{
+				Mul : true,
+				Set : [[true,'Independent Connection']],
+				Blk : false,
+				Inp : function()
+				{
+					LinkData && WebSocketSend(Proto.LinkInd,
+					{
+						IsGlobal : IsGlobal,
+						Row : LinkData.Row,
+						Ind : Ind.V().length
 					})
 				}
 			}),
@@ -661,8 +686,12 @@
 				Stat
 					.S(SolveSize(LinkData.F2T))
 					.C(SolveSize(LinkData.T2F))
+			},
+			OnInd = function()
+			{
+				Ind.V(LinkData.Ind ? [true] : [],true)
 			};
-			WV.ApR([Enabled,Save,Del],Control)
+			WV.ApR([Enabled,Ind,Save,Del],Control)
 			WV.ApR([Index,Control,Target.R,Addr,Deploy,Stat],Card)
 			return {
 				R : Card,
@@ -677,6 +706,7 @@
 					OnOF()
 					OnTarget()
 					OnRec()
+					OnInd()
 				},
 				Out : function()
 				{
@@ -693,6 +723,7 @@
 				{
 					if (Q)
 					{
+						Ind.On()
 						WV.ApR([Save,Del],Control)
 						Target.R.On()
 						Addr.On()
@@ -700,6 +731,7 @@
 					}
 					else
 					{
+						Ind.Off()
 						WV.Del(Save.R)
 						WV.Del(Del.R)
 						Target.R.Off()
@@ -739,7 +771,8 @@
 				},
 				Mod : OnTarget,
 				Rec : OnRec,
-				Dep : OnOF
+				Dep : OnOF,
+				Ind : OnInd
 			}
 		},
 		SortList = WR.Sort(function(Q,S)
@@ -911,7 +944,8 @@
 				OnCount()
 			},
 			Rec : Dispatch('Rec'),
-			Dep : Dispatch('Dep')
+			Dep : Dispatch('Dep'),
+			Ind : Dispatch('Ind')
 		})
 
 		return {
