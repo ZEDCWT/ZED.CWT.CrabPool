@@ -1769,7 +1769,6 @@ module.exports = Option =>
 				var
 				AuxID = ++RecID,
 				At = WW.Now(),
-				IndKey,
 				Fin = () =>
 				{
 					if (AuxID)
@@ -1778,8 +1777,6 @@ module.exports = Option =>
 						AuxOnFin(null,AuxID)
 						OnLinkDisconnect(IsGlobal,Row)
 						AuxID = null
-						IndKey && Sec.Ind(IndKey,null)
-						IndKey = null
 					}
 				},
 				Sec;
@@ -1810,10 +1807,9 @@ module.exports = Option =>
 						Sec.O(Proto.WishR,
 						{
 							ID : AuxID,
-							Key : PipeMaster ? null : IndKey = Sec.Ind(AuxID,SecI =>
+							Key : PipeMaster ? null : Sec.Ind(AuxID,SecI =>
 							{
 								IndAccept(SecI,Sec,AuxID)
-								IndKey = null
 								AuxOnWaitTake(SecI,AuxID,null)
 							}),
 							From : MachineRow,

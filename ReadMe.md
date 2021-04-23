@@ -75,8 +75,9 @@ You can also use it as an `Express.Router` and mount it to any path you like on 
 	+ `Decipher` : `import('crypto').Cipher` Optional. A decipher responses to the `Cipher` above. See [Example : Cipher][ExCipher]
 	+ `PortMaster` : `number` Required for the Master, must not be present for Nodes. Port to deploy a Master server.
 	+ `PortWeb` : `number` Optional. Port to deploy the Web Server.
-	+ `Pipe(Log)` Require for Nodes, must not be present for the Master. See [Example : Pipe][ExPipe]
+	+ `Pipe(Log,Ind?)` Require for Nodes, must not be present for the Master. See [Example : Pipe][ExPipe]
 		+ `Log` : `(...Q : any[]) => any`. Write logs.
+		+ `Ind?` : `boolean`. True will be passed if this pipe connection is independent for a single socket.
 		+ Returns : `import('net').Socket | WishNS.Provider<import('net').Socket>`
 	+ `PipeRetry` : `number` Optional. Default `1E4`ms. Interval to wait before connecting to the Master again after the previous connection closed.
 	+ `Timeout` : `number` Optional. Default `3E5`ms. Time to wait to shutdown an inactive connection.
