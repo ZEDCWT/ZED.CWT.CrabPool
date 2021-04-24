@@ -62,7 +62,11 @@ declare module CrabPoolNS
 				To : number
 				Req : string
 				Client : string
+				Server : string
+				Ind : string
 			}) : AnyP
+			RecClient(Q : {Row : number,Client : string}) : AnyP
+			RecServer(Q : {Row : number,Server : string}) : AnyP
 			RecCon(Q : {Row : number,At : number}) : AnyP
 			RecRec(Q : {Row : number,Duration : number,F2T : number,T2F : number}) : AnyP
 			RecOff(Row : number) : AnyP
@@ -163,6 +167,10 @@ declare module CrabPoolNS
 		Req? : string
 		F2T? : number
 		T2F? : number
+		Client? : string
+		Err? : string
+		Server? : string
+		Ind? : number
 	}
 	interface Stat
 	{

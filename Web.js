@@ -1460,7 +1460,7 @@
 					WV.ApR([Index,Desc],Card)
 					WV.Ap(Card,V)
 					return {
-						U : function(B)
+						U : function(/**@type {CrabPoolNS.Rec}*/ B)
 						{
 							WV.T(Index,'#' + B.Row)
 							B.Online && WV.Ap(Cut.R,Index)
@@ -1468,8 +1468,10 @@
 							[
 								'From ' + PoolShowRow(B.HostFrom) +
 									(B.Client ? ' (' + B.Client + ')' : ''),
-								'To ' + PoolShowRow(B.HostTo),
-								'Address ' + B.Req,
+								'To ' + PoolShowRow(B.HostTo) +
+									(B.Server ? ' (' + B.Server + ')' : ''),
+								(B.Ind ? '[Independent] ' : '') +
+									'Address ' + B.Req,
 								'Created ' + WW.StrDate(B.Birth) +
 									' Connected ' + (null == B.Connected ? '-' :
 										'+' + (B.Connected < 1E3 + B.Birth ? B.Connected - B.Birth + 'ms' : WW.StrMS(B.Connected - B.Birth,true))) +

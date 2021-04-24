@@ -1,5 +1,5 @@
 
-Á#
+ë#
 Proto.proto"
 Fatal
 Msg (	RMsg"
@@ -135,7 +135,7 @@ NodeStatus
 MasterIP (	RMasterIP".
 TokenNew
 Old (ROld
-New (RNew"“
+New (RNew"½
 Rec
 Row (RRow
 Online (ROnline
@@ -149,7 +149,9 @@ NodeStatus
 T2F
  (RT2F
 Client (	RClient
-Err (	RErr"8
+Err (	RErr
+Server (	RServer
+Ind (RInd"8
 RecReq
 Page (RPage
 PageSize (RPageSize"6

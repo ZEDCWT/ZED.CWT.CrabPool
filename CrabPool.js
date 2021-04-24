@@ -425,18 +425,12 @@ module.exports = Option =>
 		PoolData,PoolIn = 0,PoolOut = 0,
 		PoolRecSave = () =>
 		{
-			if (PoolData && PoolIn + PoolOut)
+			if (PoolData)
 			{
-				OnPoolRec(
-				{
-					Row : PoolData.Row,
-					F2T : PoolData.F2T += PoolOut,
-					T2F : PoolData.T2F += PoolIn,
-				})
+				SavePoolRec(PoolData,PoolOut,PoolIn)
 				PoolIn = PoolOut = 0
 			}
 		},
-		PoolOnRec = WR.ThrottleDelay(StatInterval,PoolRecSave),
 
 		OnPR = new Map,
 		OnFin = new Map,
@@ -472,7 +466,7 @@ module.exports = Option =>
 				}
 				StatOnOut(F += Data.length)
 				PoolOut += F
-				PoolData && PoolOnRec()
+				PoolRecSave()
 			}
 		},
 		Wait = WC.BW(),
@@ -571,7 +565,7 @@ module.exports = Option =>
 			{
 				StatOnIn(Q.length)
 				PoolIn += Q.length
-				PoolData && PoolOnRec()
+				PoolRecSave()
 				if (Raw)
 				{
 					OnAux(R,Raw,Q)
@@ -1113,6 +1107,31 @@ module.exports = Option =>
 		else OnPoolDel(Data)
 	},
 	OnPoolRec = OnDB(null,DB.PoolRec,Data => WebBroadcast(Proto.OnPoolRec,Data)),
+	SavePoolRecPrev = {},
+	SavePoolRec = (PoolData,F2T,T2F) =>
+	{
+		var
+		Slot = SavePoolRecPrev[PoolData.Row];
+		if (Slot)
+		{
+			Slot[0] += F2T
+			Slot[1] += T2F
+		}
+		else
+		{
+			SavePoolRecPrev[PoolData.Row] = Slot = [F2T,T2F]
+			WW.To(StatInterval,function()
+			{
+				OnPoolRec(
+				{
+					Row : PoolData.Row,
+					F2T : PoolData.F2T += Slot[0],
+					T2F : PoolData.T2F += Slot[1],
+				})
+				SavePoolRecPrev[PoolData.Row] = null
+			})
+		}
+	},
 
 	OnDBLink =
 	/**
@@ -1200,8 +1219,8 @@ module.exports = Option =>
 		if (L)
 		{
 			--L.Using
+			WebBroadcast(Proto.OnLinkDis,{IsGlobal,Row})
 		}
-		WebBroadcast(Proto.OnLinkDis,{IsGlobal,Row})
 	},
 	OnLinkMod = OnDBLink(true,Proto.OnLinkMod,'Mod'),
 	OpLinkMod = (Sec,Data) => OpLinkCheck(Sec,Data) && OnLinkMod(Data),
@@ -1253,6 +1272,8 @@ module.exports = Option =>
 	},
 
 	OnRecNew = OnDB(null,DB.RecNew),
+	OnRecClient = OnDB(null,DB.RecClient),
+	OnRecServer = OnDB(null,DB.RecServer),
 	OnRecCon = OnDB(null,DB.RecCon),
 	OnRecRec = OnDB(null,DB.RecRec),
 	OnRecOff = OnDB(null,DB.RecOff),
@@ -1427,6 +1448,8 @@ module.exports = Option =>
 						From : Data.From,
 						To : Data.To,
 						Req : SolveReq(Data.Host,Data.Port),
+						Client : RemoteIP(S),
+						Server : Data.To === MachineRow ? null : RemoteIP(MasterOnline.get(Data.To).S),
 					})
 					StatOnConn()
 					if (Data.To === MachineRow)
@@ -1468,6 +1491,9 @@ module.exports = Option =>
 						From : Data.From,
 						To : Data.To,
 						Req : SolveReq(Data.Host,Data.Port),
+						Client : RemoteIP(S),
+						Server : Data.To === MachineRow ? null : RemoteIP(MasterOnline.get(Data.To).S),
+						Ind : true,
 					})
 					StatOnConn()
 					Sec.O(Proto.TakeR,
@@ -1476,6 +1502,7 @@ module.exports = Option =>
 						Key : Sec.Ind(AuxID,SecI =>
 						{
 							var SecS;
+							OnRecClient({Row : AuxID,Client : RemoteIP(S) + '+' + RemoteIP(SecI.S)})
 							if (Data.To === MachineRow)
 							{
 								IndAccept(SecI,Sec,AuxID)
@@ -1490,6 +1517,7 @@ module.exports = Option =>
 									Data.ID = AuxID
 									Data.Key = SecS.Ind(AuxID,SecI =>
 									{
+										OnRecServer({Row : AuxID,Server : RemoteIP(SecS.S) + '+' + RemoteIP(SecI.S)})
 										IndAccept(SecI,SecS,AuxID)
 										AuxOnWaitTake(SecI,AuxID,null)
 									})
@@ -1605,6 +1633,7 @@ module.exports = Option =>
 						From : Data.From,
 						To : Data.To,
 						Req : SolveReq(Data.Host,Data.Port),
+						Client : RemoteIP(S),
 					})
 					StatOnConn()
 
@@ -1625,16 +1654,27 @@ module.exports = Option =>
 						From : Data.From,
 						To : Data.To,
 						Req : SolveReq(Data.Host,Data.Port),
+						Client : RemoteIP(S),
+						Ind : true,
 					})
 					StatOnConn()
 
 					MakeInd(AuxID,Data.Key).Now(S =>
 					{
-						IndAccept(S,Sec,AuxID)
-						AuxMakeRawPipe(AuxID,At,AuxMakeRaw(Data.Host,Data.Port),S,null,false)
+						if (AuxPool.has(AuxID))
+						{
+							IndAccept(S,Sec,AuxID)
+							AuxMakeRawPipe(AuxID,At,AuxMakeRaw(Data.Host,Data.Port),S,null,false)
+						}
+						else
+						{
+							EndSocket(S.S)
+						}
 					},E =>
 					{
-						AuxPipeFin(Sec,Data.ID,`IndErr | ${E}`)
+						E = `IndErr | ${E}`
+						AuxOnFin(null,AuxID,E)
+						AuxPipeFin(Sec,Data.ID,E)
 					})
 					AuxPool.set(AuxID,
 					[
@@ -1662,7 +1702,9 @@ module.exports = Option =>
 						AuxOnWaitTake(S,Data.ID,null)
 					},E =>
 					{
-						AuxPipeFin(Sec,Data.To,`IndErr | ${E}`)
+						E = `IndErr | ${E}`
+						AuxOnFin(null,Data.ID,E)
+						AuxPipeFin(Sec,Data.To,E)
 					})
 				},
 				[Proto.AuxFin] : Data => AuxOnFin(Sec,Data.ID,Data.Err),
@@ -1779,7 +1821,16 @@ module.exports = Option =>
 						AuxID = null
 					}
 				},
-				Sec;
+				Sec = Target === MachineRow ?
+					null :
+					PipeMaster ?
+						NodeOnline && !!PoolMapRow[Target] ?
+							NodeMasterSec :
+							null :
+						MasterOnline.has(Target) ?
+							MasterOnline.get(Target) :
+							null;
+
 				OnLinkCon({IsGlobal,Row,At})
 				OnRecNew(
 				{
@@ -1789,19 +1840,18 @@ module.exports = Option =>
 					To : Target,
 					Req,
 					Client : RemoteIP(S),
+					Server : Sec && RemoteIP(Sec.S),
+					Ind : Ind && Sec && Sec.Feat(FeatureInd),
 				})
 				StatOnConn()
 				if (Target === MachineRow)
 				{
 					AuxMakeRawRaw(AuxID,At,S,AuxMakeRaw(Host,Port),IsGlobal,Row)
 				}
-				else if (PipeMaster ?
-					NodeOnline && !!PoolMapRow[Target] :
-					MasterOnline.has(Target))
+				else if (Sec)
 				{
 					S.on('error',WW.O)
 						.on('close',Fin)
-					Sec = PipeMaster ? NodeMasterSec : MasterOnline.get(Target)
 					if (Ind && Sec.Feat(FeatureInd))
 					{
 						Sec.O(Proto.WishR,
@@ -1809,6 +1859,7 @@ module.exports = Option =>
 							ID : AuxID,
 							Key : PipeMaster ? null : Sec.Ind(AuxID,SecI =>
 							{
+								OnRecServer({Row : AuxID,Server : RemoteIP(Sec.S) + '+' + RemoteIP(SecI.S)})
 								IndAccept(SecI,Sec,AuxID)
 								AuxOnWaitTake(SecI,AuxID,null)
 							}),

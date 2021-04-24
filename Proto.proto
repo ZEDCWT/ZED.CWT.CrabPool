@@ -258,6 +258,8 @@ message Rec
 	uint64 T2F = 10;
 	string Client = 11;
 	string Err = 12;
+	string Server = 13;
+	uint64 Ind = 14;
 }
 
 message RecReq

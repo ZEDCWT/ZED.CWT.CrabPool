@@ -194,6 +194,8 @@ module.exports = Option =>
 				['Rec','Err text'],
 				['LinkGlobal','Ind integer'],
 				['Link','Ind integer'],
+				['Rec','Server text'],
+				['Rec','Ind integer'],
 			]).FMapO(1,([V,B]) => Ignore(`alter table ${V} add ${B}`))
 				.Fin()),
 
@@ -268,8 +270,10 @@ module.exports = Option =>
 			Link : MakeLink('Link'),
 
 			RecMax : () => Get(`select max(Row) Max from Rec`).Map(B => B.Max),
-			RecNew : Q => Run(`insert into Rec values(?,9,?,null,null,?,?,?,null,null,?,null)`,
-				[Q.Row,Q.Birth,Q.From,Q.To,Q.Req,Q.Client]),
+			RecNew : Q => Run(`insert into Rec values(?,9,?,null,null,?,?,?,null,null,?,null,?,?)`,
+				[Q.Row,Q.Birth,Q.From,Q.To,Q.Req,Q.Client,Q.Server,Q.Ind ? 9 : null]),
+			RecClient : Q => Run(`update Rec set Client = ? where ? = Row`,[Q.Client,Q.Row]),
+			RecServer : Q => Run(`update Rec set Server = ? where ? = Row`,[Q.Server,Q.Row]),
 			RecCon : Q => Run(
 			`
 				update Rec set
