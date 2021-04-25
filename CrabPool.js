@@ -122,8 +122,8 @@ module.exports = Option =>
 	PortWeb = Option.PortWeb,
 	PipeMaster = Option.Pipe,
 	PipeRetry = Option.PipeRetry || 1E4,
-	PipeTimeout = Option.PipeTimeout || 3E5,
 	TickInterval = Option.Tick || 6E4,
+	PipeTimeout = Option.PipeTimeout || 2 * TickInterval,
 	PathData = Option.Data || WN.JoinP(WN.Data,'ZED/CrabPool'),
 	PathLog = WN.JoinP(PathData,'Log'),
 	LogRoll,
@@ -516,6 +516,7 @@ module.exports = Option =>
 			Raw : AuxID =>
 			{
 				Raw = AuxID
+				TOD.F()
 				Soc.on('end',() => AuxOnEnd(R,AuxID))
 			},
 			Ind : (K,V) =>
@@ -560,6 +561,7 @@ module.exports = Option =>
 				[...OnFin.values()].forEach(V => V(null,'Pipe Closed'))
 				PoolRecSave()
 				PoolData = null
+				TOD.F()
 			})
 			.on('data',Q =>
 			{
@@ -1588,7 +1590,7 @@ module.exports = Option =>
 			Log = MakeLog(LogPrefix),
 			HelloSeed = MakeSeed(),
 			OnLinkGlobal = H => Data => Data.IsGlobal && H(Data),
-			PingTooLong = WW.TOD(2 * TickInterval,() =>
+			PingTooLong = WW.TOD(1.5 * TickInterval,() =>
 			{
 				Log('No Ping')
 				MakeNoise(Sec)
@@ -1884,6 +1886,7 @@ module.exports = Option =>
 				}
 				else
 				{
+					OnRecErr({Row : AuxID,Err : 'Target Offline'})
 					OnRecOff(AuxID)
 					Fin()
 				}

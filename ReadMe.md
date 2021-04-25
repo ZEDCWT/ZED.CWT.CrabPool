@@ -80,8 +80,8 @@ You can also use it as an `Express.Router` and mount it to any path you like on 
 		+ `Ind?` : `boolean`. True will be passed if this pipe connection is independent for a single socket.
 		+ Returns : `import('net').Socket | WishNS.Provider<import('net').Socket>`
 	+ `PipeRetry` : `number` Optional. Default `1E4`ms. Interval to wait before connecting to the Master again after the previous connection closed.
-	+ `Timeout` : `number` Optional. Default `3E5`ms. Time to wait to shutdown an inactive connection.
 	+ `Tick` : `number` Optional. Default `6E4`ms. Heartbeat interval.
+	+ `Timeout` : `number` Optional. Default `2 * Tick`ms. Time to wait to shutdown an inactive connection.
 	+ `Data` : `string` Optional. Path to store settings, logs and other files. See [Data Folder Structure](#data-folder-structure)
 	+ `Log` : `(...Q : any[]) => any` Optional. Control how should `CrabPool` logs.
 + Returns : `Object`
