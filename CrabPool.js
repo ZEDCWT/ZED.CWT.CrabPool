@@ -354,7 +354,8 @@ module.exports = Option =>
 				L.Target = Q.Target
 				L.Host = Q.Host
 				L.Port = Q.Port
-				S.D(L)
+				S.D(L,IsGlobal)
+				IsGlobal && S.PR(LinkShouldPause(Q.Local))
 			}),
 			Del : Q =>
 			{
