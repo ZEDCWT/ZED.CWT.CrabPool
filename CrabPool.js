@@ -418,6 +418,7 @@ module.exports = Option =>
 	MakeSec = (Soc,OnProto,OnAux) =>
 	{
 		var
+		Corked = false,
 		Online = true,
 		Feat,Raw,
 		C = MakeCipher(),D = MakeDecipher(),
@@ -491,6 +492,11 @@ module.exports = Option =>
 
 		R =
 		{
+			C : Q =>
+			{
+				if (Corked !== (Corked = !!Q))
+					Corked ? Soc.cork() : Soc.uncork()
+			},
 			D : TOD.D,
 			O : (ProtoID,Data) => Write(ProtoID,ProtoEnc(ProtoID,Data),true),
 			B : (ProtoID,Data) => Write(ProtoID,Data,true),
@@ -500,6 +506,7 @@ module.exports = Option =>
 			{
 				R.Fat = ErrorS(E)
 				R.O(Proto.Fatal,{Msg : E})
+				Corked && Soc.uncork()
 				EndSocket(Soc)
 			},
 			Fat : '',
@@ -532,9 +539,9 @@ module.exports = Option =>
 					AuxPool.set(K,
 					[
 						false,
-						(_,E) =>
+						(S,E) =>
 						{
-							if (RecErr)
+							if ((!S || S === R) && RecErr)
 							{
 								OnRecOff(K)
 								AuxPool.delete(K)
@@ -553,6 +560,7 @@ module.exports = Option =>
 				return Key
 			},
 			IndHas : K => WR.Has(K,Ind),
+			IndDel : K => WR.Del(K,Ind),
 		};
 
 		Soc
@@ -905,7 +913,7 @@ module.exports = Option =>
 	AuxOnEnd = AuxOnPipe0(AuxPoolKeyEnd),
 	AuxOnPR = AuxOnPipe1(AuxPoolKeyPR),
 	AuxWaitSecExpCheck = (Ind,Exp,Sec) => Ind ?
-		Exp.Pool().Row === Sec.Pool().Row:
+		Exp.Pool().Row === Sec?.Pool()?.Row:
 		Exp === Sec,
 	AuxWaitRaw = (ID,Begin,Soc,SecExp,Link,Ind) =>
 	{
@@ -934,19 +942,21 @@ module.exports = Option =>
 				AuxMakeRawPipe(ID,Begin,Soc,Sec,AuxID,Link),
 		])
 	},
-	AuxWaitPipe = (ID,Begin,SecQ,AuxIDQ,SecExp,Ind) =>
+	AuxWaitPipe = (ID,Begin,SecQ,AuxIDQ,SecExp,IndQ,IndS) =>
 	{
 		var
 		RecErr = AuxMakeRecErr(ID),
 		Fin = (S,E) =>
 		{
-			if ((!S || S === SecQ || S === SecExp) && SecQ)
+			if ((!S || S === SecQ || AuxWaitSecExpCheck(IndS,SecExp,S)) && SecQ)
 			{
 				RecErr[AuxMakeRecErrKeyRec](E,
 					S === SecQ ? AuxMakeRecErrSideClient :
-					S === SecExp ? AuxMakeRecErrSideServer :
+					AuxWaitSecExpCheck(IndS,SecExp,S) ? AuxMakeRecErrSideServer :
 					null)
 				S === SecQ || AuxPipeFin(SecQ,AuxIDQ,RecErr[AuxMakeRecErrKeyErr]())
+				IndS && SecExp.IndDel(IndS)
+				OnRecOff(ID)
 				AuxPool.delete(ID)
 				SecQ.OnFin(ID)
 				SecQ = null
@@ -959,9 +969,11 @@ module.exports = Option =>
 			Fin,
 			(SecS,AuxIDS) =>
 			{
-				if (AuxWaitSecExpCheck(Ind,SecExp,SecS))
+				if (AuxWaitSecExpCheck(IndS,SecExp,SecS))
 				{
-					SecQ.O(Proto.Take,{From : AuxIDQ,To : ID})
+					IndQ ?
+						IndAccept(SecQ,IndQ,ID) :
+						SecQ.O(Proto.Take,{From : AuxIDQ,To : ID})
 					AuxMakePipePipe(ID,Begin,SecQ,AuxIDQ,SecS,AuxIDS)
 				}
 			},
@@ -1342,6 +1354,7 @@ module.exports = Option =>
 						Inited = true
 						if (Data.Ack !== HelloSeed) return Sec.F(`Ack failure ${HelloSeed} ${Data.Ack}`)
 
+						Sec.C(true)
 						MasterOnline.has(Row) &&
 							MasterOnline.get(Row).F('Kicked by ' + RemoteIP(S))
 						OnPoolOn(
@@ -1379,6 +1392,7 @@ module.exports = Option =>
 						Sec.Pool(PoolData)
 						Sec.Feat(HelloData.Feat)
 						Ping.C()
+						Sec.C(false)
 						return
 					}
 
@@ -1407,6 +1421,7 @@ module.exports = Option =>
 						Ack : Data.Syn,
 						Feat : Feature,
 					})
+					Sec.C(false)
 
 					Log('Node',Row)
 				},
@@ -1514,8 +1529,6 @@ module.exports = Option =>
 							{
 								if (SecS.Feat(FeatureInd))
 								{
-									IndAccept(SecI,Sec,AuxID)
-									AuxWaitPipe(AuxID,At,SecI,Data.ID,SecS,true)
 									Data.ID = AuxID
 									Data.Key = SecS.Ind(AuxID,SecI =>
 									{
@@ -1523,11 +1536,12 @@ module.exports = Option =>
 										IndAccept(SecI,SecS,AuxID)
 										AuxOnWaitTake(SecI,AuxID,null)
 									})
+									AuxWaitPipe(AuxID,At,SecI,null,SecS,Sec,Data.Key)
 									SecS.O(Proto.WishR,Data)
 								}
 								else
 								{
-									AuxWaitPipe(AuxID,At,Sec,Data.ID,SecS)
+									AuxWaitPipe(AuxID,At,SecI,null,SecS,Sec)
 									Data.ID = AuxID
 									SecS.O(Proto.Wish,Data)
 								}
@@ -1548,6 +1562,11 @@ module.exports = Option =>
 						!SecO.IndHas(Data.Key))
 						return Sec.F('Bad Ind')
 					SecO.Ind(Data.Key,Sec)
+					/*
+						In a RawPipe situation, the Raw socket is resumed in the nextTick before we uncork
+						So we may save a round trip if there are already data buffered in the Raw socket
+					*/
+					process.nextTick(() => Sec.C(false))
 				},
 				[Proto.AuxFin] : WithInit(Data => AuxOnFin(Sec,Data.ID,Data.Err)),
 				[Proto.AuxEnd] : WithInit(Data => AuxOnEnd(Sec,Data.ID)),
@@ -1569,6 +1588,7 @@ module.exports = Option =>
 				}
 			})
 			Log('Connected')
+			Sec.C(true)
 			MakeNoise(Sec)
 		}).listen(PortMaster || 0)
 			.on('listening',() => MakeLog('Master')('Deploy',Master.address().port))
@@ -1769,12 +1789,29 @@ module.exports = Option =>
 	MakeInd = (AuxID,Key) => MakePipeMaster((S,O) =>
 	{
 		var
+		Handled = false,
 		Sec = MakeSec(S,MakeProtoAct(ProtoDec,
 		{
-			[Proto.Fatal] : Data => AuxOnFin(null,AuxID,Data.Msg),
-			[Proto.Ind] : () => O.U(Sec),
+			[Proto.Fatal] : Data =>
+			{
+				Handled = true
+				AuxOnFin(null,AuxID,Data.Msg)
+			},
+			[Proto.Ind] : () =>
+			{
+				Handled = true
+				O.U(Sec)
+			},
 		}),AuxOnData);
-		S.on('error',E => AuxOnFin(null,AuxID,E))
+		S.on('error',E =>
+		{
+			Handled = true
+			AuxOnFin(null,AuxID,E)
+		}).on('close',() =>
+		{
+			Handled ||
+				AuxOnFin(null,AuxID,'Closed Without Response')
+		})
 		Sec.O(Proto.Ind,
 		{
 			Seed : MakeSeedBuf(),

@@ -970,7 +970,7 @@
 
 	WV.Style(WW.Fmt
 	(
-		'body{height:100%;font-size:14px;overflow:hidden}' +
+		'body{height:100%;font-size:14px;overflow:hidden;word-break:break-all}' +
 
 		'.`T`>.`M`{text-align:center;margin:6px 0}' +
 		'.`V`{padding:0 20px}' +

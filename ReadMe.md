@@ -144,9 +144,9 @@ let Addr
 
 CrabPool(
 {
-	Pipe : Wish.X.WrapPromise(Log =>
+	Pipe : Wish.X.WrapPromise((Log,Ind) =>
 	{
-		if (!Control && Addr) return Promise.resolve(Net.createConnection(Addr))
+		if (Ind && Addr) return Promise.resolve(Net.createConnection(Addr))
 		return ResolveAddr()
 			.then(O =>
 			{
