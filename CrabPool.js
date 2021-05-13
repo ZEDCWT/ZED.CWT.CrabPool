@@ -960,10 +960,13 @@ module.exports = Option =>
 				OnRecOff(ID)
 				AuxPool.delete(ID)
 				SecQ.OnFin(ID)
-				SecQ = null
+				SecExp.OnFin(ID)
+				SecQ =
+				SecExp = null
 			}
 		};
 		SecQ.OnFin(ID,Fin)
+		SecExp.OnFin(ID,Fin)
 		AuxPool.set(ID,
 		[
 			0,
