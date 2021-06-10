@@ -531,26 +531,29 @@ module.exports = Option =>
 			{
 				var
 				RecErr,
-				Key;
+				Key,
+				Fin;
 				if (WW.IsFunc(V))
 				{
 					RecErr = AuxMakeRecErr(K)
 					Key = Crypto.randomBytes(16).toString('HEX');
 					Ind[Key] = V
+					Fin = (S,E) =>
+					{
+						if ((!S || S === R) && RecErr)
+						{
+							OnRecOff(K)
+							AuxPool.delete(K)
+							WR.Del(Key,V)
+							RecErr[AuxMakeRecErrKeyRec](E)
+							RecErr = null
+						}
+					}
+					R.OnFin(K,Fin)
 					AuxPool.set(K,
 					[
 						false,
-						(S,E) =>
-						{
-							if ((!S || S === R) && RecErr)
-							{
-								OnRecOff(K)
-								AuxPool.delete(K)
-								WR.Del(Key,V)
-								RecErr[AuxMakeRecErrKeyRec](E)
-								RecErr = null
-							}
-						}
+						Fin
 					])
 				}
 				else if (Key = Ind[K])
@@ -1672,7 +1675,17 @@ module.exports = Option =>
 					var
 					AuxID = ++RecID,
 					At = WW.Now(),
-					RecErr = AuxMakeRecErr(AuxID);
+					RecErr = AuxMakeRecErr(AuxID),
+					Fin = (_,E) =>
+					{
+						if (RecErr)
+						{
+							OnRecOff(AuxID)
+							AuxPool.delete(AuxID)
+							RecErr[AuxMakeRecErrKeyRec](E)
+							RecErr = null
+						}
+					};
 					OnRecNew(
 					{
 						Row : AuxID,
@@ -1702,19 +1715,11 @@ module.exports = Option =>
 						AuxOnFin(null,AuxID,E)
 						AuxPipeFin(Sec,Data.ID,E)
 					})
+					Sec.OnFin(AuxID,Fin)
 					AuxPool.set(AuxID,
 					[
 						false,
-						(_,E) =>
-						{
-							if (RecErr)
-							{
-								OnRecOff(AuxID)
-								AuxPool.delete(AuxID)
-								RecErr[AuxMakeRecErrKeyRec](E)
-								RecErr = null
-							}
-						}
+						Fin
 					])
 				},
 				[Proto.TakeR] : Data =>
@@ -1793,6 +1798,8 @@ module.exports = Option =>
 	MakeInd = (AuxID,Key) => MakePipeMaster((S,O) =>
 	{
 		var
+		Time = MakeTime(),
+		Log = MakeLog(`Ind [${AuxID}]`),
 		Handled = false,
 		Sec = MakeSec(S,MakeProtoAct(ProtoDec,
 		{
@@ -1811,8 +1818,10 @@ module.exports = Option =>
 		{
 			Handled = true
 			AuxOnFin(null,AuxID,E)
-		}).on('close',() =>
+		}).on('close',E =>
 		{
+			Sec.Fat &&
+				Log('Closed',Time(),E,Sec.Fat)
 			Handled ||
 				AuxOnFin(null,AuxID,'Closed Without Response')
 		})
