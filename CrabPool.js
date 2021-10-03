@@ -372,6 +372,7 @@ module.exports = Option =>
 	LinkGlobal = MakeLink(9),
 	Link = MakeLink(0),
 	RecID = IDFrom,
+	RecCount = 0,
 	StatAt,
 	StatIn,
 	StatOut,
@@ -1292,7 +1293,7 @@ module.exports = Option =>
 		})
 	},
 
-	OnRecNew = OnDB(null,DB.RecNew),
+	OnRecNew = OnDB(null,DB.RecNew,() => ++RecCount),
 	OnRecClient = OnDB(null,DB.RecClient),
 	OnRecServer = OnDB(null,DB.RecServer),
 	OnRecCon = OnDB(null,DB.RecCon),
@@ -2201,9 +2202,8 @@ module.exports = Option =>
 				if (100 < PageSize)
 					return Err('PageSize too huge')
 
-				EndRec(DB.RecCount().FMap(Count =>
-					DB.RecGet(Page,PageSize).Tap(Rec =>
-						Send(Proto.RecRes,{Count,Rec})))
+				EndRec(DB.RecGet(Page,PageSize)
+					.Tap(Rec => Send(Proto.RecRes,{Count : RecCount,Rec}))
 					.Now(null,E => Err(`Failed to load rec ${ErrorS(E)}`)))
 			}),
 			[Proto.RecCut] : WithInit(Data =>
@@ -2342,6 +2342,8 @@ module.exports = Option =>
 			.FMap(LinkGlobal.Init)
 			.FMap(DB.RecMax)
 			.Tap(B => RecID = B || RecID)
+			.FMap(DB.RecCount)
+			.Tap(B => RecCount = B)
 			.FMap(() => StatFresh() || DB.StatGet(StatAt))
 			.Tap(B =>
 			{
