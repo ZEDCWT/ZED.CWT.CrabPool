@@ -1622,6 +1622,7 @@ module.exports = Option =>
 				Log('No Ping')
 				MakeNoise(Sec)
 			}),
+			SecPoolPrepared,
 			Sec = NodeMasterSec = MakeSec(S,MakeProtoAct(ProtoDec,
 			{
 				[Proto.Fatal] : Data => Log('Fatal',Data.Msg),
@@ -1638,7 +1639,6 @@ module.exports = Option =>
 					DataSession.D(DataSessionKeyNodeStatus,NodeStatus)
 					Sec.O(Proto.Hello,{Ack : Data.Syn})
 					WebBroadcast(Proto.NodeStatus,NodeStatus)
-					Sec.Pool(PoolMapRow[NodeStatus.Master])
 					Sec.Feat(Data.Feat)
 					PingTooLong.D()
 					Log('Authed')
@@ -1744,7 +1744,15 @@ module.exports = Option =>
 
 
 
-				[Proto.OnPoolLst] : OnPoolLst,
+				[Proto.OnPoolLst] : Data =>
+				{
+					OnPoolLst(Data)
+					if (!SecPoolPrepared)
+					{
+						SecPoolPrepared = true
+						Sec.Pool(PoolMapRow[NodeStatus.Master])
+					}
+				},
 				[Proto.OnPoolNew] : OnPoolNew,
 				[Proto.OnPoolNm] : OnPoolNm,
 				[Proto.OnPoolDes] : OnPoolDes,
@@ -1881,7 +1889,13 @@ module.exports = Option =>
 							null :
 						MasterOnline.has(Target) ?
 							MasterOnline.get(Target) :
-							null;
+							null,
+				Bad = Q =>
+				{
+					OnRecErr({Row : AuxID,Err : Q})
+					OnRecOff(AuxID)
+					Fin()
+				};
 
 				OnLinkCon({IsGlobal,Row,At})
 				OnRecNew(
@@ -1899,6 +1913,10 @@ module.exports = Option =>
 				if (Target === MachineRow)
 				{
 					AuxMakeRawRaw(AuxID,At,S,AuxMakeRaw(Host,Port),IsGlobal,Row)
+				}
+				else if (Sec && !Sec.Pool())
+				{
+					Bad('Target Not Prepared')
 				}
 				else if (Sec)
 				{
@@ -1936,9 +1954,7 @@ module.exports = Option =>
 				}
 				else
 				{
-					OnRecErr({Row : AuxID,Err : 'Target Offline'})
-					OnRecOff(AuxID)
-					Fin()
+					Bad('Target Offline')
 				}
 			}).listen(ServerPort = Local)
 				.on('listening',() =>
