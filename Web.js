@@ -1398,9 +1398,13 @@
 						{
 							if (From <= V.At && V.At < To)
 							{
-								Sent += V.OutBound
-								Received += V.InBound
-								Conn += V.Conn
+								/*
+									I have no idea how the broken record got inserted
+									{At : 1634054400001}
+								*/
+								Sent += V.OutBound || 0
+								Received += V.InBound || 0
+								Conn += V.Conn || 0
 							}
 						},Q.Stat)
 						WV.T(U,
