@@ -456,6 +456,7 @@
 				P.VerNode = Data.VN
 				P.VerWish = Data.VW
 				P.VerPool = Data.VP
+				P.Plat = Data.Plat
 				PoolOnData.On(P)
 			}
 		},
@@ -1095,7 +1096,7 @@
 
 				Card = WV.Rock(ClassCard + ' ' + WV.S4,'fieldset'),
 				Index = WV.A('legend'),
-				Identity = WV.Fmt('#`W` [`O` `P`ms] (`I` Node v`VN` Wish v`VW` Pool v`VP`)','-',WV.A('span')),
+				Identity = WV.Fmt('#`W` [`O` `P`ms] (`I``PL` Node v`VN` Wish v`VW` Pool v`VP`)','-',WV.A('span')),
 				MakeEdit = function(Opt,Act)
 				{
 					var V,R;
@@ -1151,6 +1152,7 @@
 						.VN(PoolData.VerNode)
 						.VW(PoolData.VerWish)
 						.VP(PoolData.VerPool)
+						.PL(PoolData.Plat ? ' ' + PoolData.Plat : '')
 					PoolDataOnline ?
 						WV.ClsA(Del.Off().R,WV.None) :
 						WV.ClsR(Del.On().R,WV.None)

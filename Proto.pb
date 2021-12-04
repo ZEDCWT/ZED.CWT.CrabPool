@@ -1,12 +1,12 @@
 
-ë#
+¨$
 Proto.proto"
 Fatal
 Msg (	RMsg"
 Err
 Msg (	RMsg"
 Warn
-Msg (	RMsg"É
+Msg (	RMsg"Ý
 Hello
 Sec (RSec
 Row (RRow
@@ -17,11 +17,12 @@
 VerWish	 (	RVerWish
 VerPool
  (	RVerPool
+Plat (	RPlat
 Feat (	RFeat"
 Ping
 Seed (RSeed"
 Noise
-Seed (RSeed"æ
+Seed (RSeed"ú
 Pool
 Row (RRow
 Enabled (REnabled
@@ -39,7 +40,8 @@
 LastOn (RLastOn
 LastOff (RLastOff
 F2T (RF2T
-T2F (RT2F"*
+T2F (RT2F
+Plat (	RPlat"*
 PoolNm
 Row (RRow
 Nm (	RNm"-
@@ -180,14 +182,15 @@ NodeStatus
 Nm (	RNm"/
 	OnPoolDes
 Row (RRow
-Des (	RDes"l
+Des (	RDes"€
 OnPoolOn
 Row (RRow
 IP (	RIP
 At (RAt
 VN (	RVN
 VW (	RVW
-VP (	RVP"-
+VP (	RVP
+Plat (	RPlat"-
 	OnPoolOff
 Row (RRow
 At (RAt"B

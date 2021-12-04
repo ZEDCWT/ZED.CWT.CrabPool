@@ -7,6 +7,7 @@ FS = require('fs'),
 HTTP = require('http'),
 Net = require('net'),
 
+PlatArch = process.platform + ' ' + process.arch,
 PoolVersion = require('./package.json').version,
 IDFrom = 7999,
 StatSpan = 36E5,
@@ -1091,6 +1092,7 @@ module.exports = Option =>
 			P.VerNode = Data.VN
 			P.VerWish = Data.VW
 			P.VerPool = Data.VP
+			P.Plat = Data.Plat
 		}
 	}),
 	OnPoolOff = OnDB(Proto.OnPoolOff,DB.PoolOff,Data =>
@@ -1373,6 +1375,7 @@ module.exports = Option =>
 							VN : HelloData.VerNode,
 							VW : HelloData.VerWish,
 							VP : HelloData.VerPool,
+							Plat : HelloData.Plat,
 						})
 						MasterOnline.set(Row,Sec)
 
@@ -1797,6 +1800,7 @@ module.exports = Option =>
 				VerNode : process.versions.node,
 				VerWish : WW.Version,
 				VerPool : PoolVersion,
+				Plat : PlatArch,
 				Feat : Feature,
 			})
 		}).RetryWhen(E => E.Delay(PipeRetry)).Now()
@@ -2329,6 +2333,7 @@ module.exports = Option =>
 						VN : process.versions.node,
 						VW : WW.Version,
 						VP : PoolVersion,
+						Plat : PlatArch,
 					})
 					OnPoolPing(
 					{

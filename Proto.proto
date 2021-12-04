@@ -34,6 +34,7 @@ message Hello
 	string VerNode = 8;
 	string VerWish = 9;
 	string VerPool = 10;
+	string Plat = 11;
 
 	repeated string Feat = 15;
 }
@@ -69,6 +70,7 @@ message Pool
 	uint64 LastOff = 14;
 	uint64 F2T = 15;
 	uint64 T2F = 16;
+	string Plat = 17;
 }
 
 message PoolNm
@@ -332,6 +334,7 @@ message OnPoolOn
 	string VN = 4;
 	string VW = 5;
 	string VP = 6;
+	string Plat = 7;
 }
 
 message OnPoolOff

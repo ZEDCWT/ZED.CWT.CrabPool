@@ -196,6 +196,7 @@ module.exports = Option =>
 				['Link','Ind integer'],
 				['Rec','Server text'],
 				['Rec','Ind integer'],
+				['Pool','Plat text'],
 			]).FMapO(1,([V,B]) => Ignore(`alter table ${V} add ${B}`))
 				.Fin()),
 
@@ -205,7 +206,7 @@ module.exports = Option =>
 				Run('update Pool set Enabled = 0 where 0 <> Enabled'),
 				...Q.Pool.map(V => Run
 				(
-					`replace into Pool values(?,9,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+					`replace into Pool values(?,9,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 					[
 						V.Row,
 						V.ID,
@@ -222,6 +223,7 @@ module.exports = Option =>
 						V.LastOff,
 						V.F2T,
 						V.T2F,
+						V.Plat,
 					]
 				))
 			).Fin(),
@@ -233,7 +235,8 @@ module.exports = Option =>
 					?,9,?,?,
 					null,null,null,
 					'','',
-					null,null,0,null,null,0,0
+					null,null,0,null,null,0,0,
+					''
 				)
 			`,[Q.Row,Q.ID,Q.Birth]),
 			PoolNm : Q => Run(`update Pool set Name = ? where ? = Row`,[Q.Nm,Q.Row]),
@@ -247,9 +250,10 @@ module.exports = Option =>
 					LastOff = ?,
 					VerNode = ?,
 					VerWish = ?,
-					VerPool = ?
+					VerPool = ?,
+					Plat = ?
 				where ? = Row
-			`,[Q.IP,Q.At,Q.At,Q.VN,Q.VW,Q.VP,Q.Row]),
+			`,[Q.IP,Q.At,Q.At,Q.VN,Q.VW,Q.VP,Q.Plat,Q.Row]),
 			PoolOff : Q => Run(
 			`
 				update Pool set

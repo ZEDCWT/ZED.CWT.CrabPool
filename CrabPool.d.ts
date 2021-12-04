@@ -44,6 +44,7 @@ declare module CrabPoolNS
 				VN : string
 				VW : string
 				VP : string
+				Plat : string
 			}) : AnyP
 			PoolOff(Q : {Row : number,At : number}) : AnyP
 			PoolPing(Q : {Row : number,Ping : number,At : number}) : AnyP
@@ -133,6 +134,7 @@ declare module CrabPoolNS
 		LastOff? : number
 		F2T? : number
 		T2F? : number
+		Plat? : string
 	}
 	interface Link
 	{
