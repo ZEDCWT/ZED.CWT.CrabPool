@@ -174,6 +174,7 @@ module.exports = Option =>
 					F2T integer,
 					T2F integer
 				);
+				create index if not exists RecOnline on Rec(Online);
 				create table if not exists Stat
 				(
 					At integer primary key,
