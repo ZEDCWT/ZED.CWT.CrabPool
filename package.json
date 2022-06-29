@@ -12,11 +12,11 @@
 	"license" : "MIT",
 	"dependencies" :
 	{
-		"@zed.cwt/wish" : ">=0.6.1",
-		"sqlite3" : ">=5.0.2"
+		"@zed.cwt/wish" : ">=0.7.1",
+		"sqlite3" : ">=5.0.8"
 	},
 	"devDependencies" :
 	{
-		"ws" : ">=8.5.0"
+		"ws" : ">=8.8.0"
 	}
 }

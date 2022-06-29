@@ -1479,11 +1479,11 @@
 								(B.Ind ? '[Independent] ' : '') +
 									'Address ' + B.Req,
 								'Created ' + WW.StrDate(B.Birth) +
-									' Connected ' + (null == B.Connected ? '-' :
+									' Connected ' + (!WR.Has('Connected',B) ? '-' :
 										'+' + (B.Connected < 1E3 + B.Birth ? B.Connected - B.Birth + 'ms' : WW.StrMS(B.Connected - B.Birth,true))) +
 									' Duration ' + WW.StrMS(B.Duration,true),
 								'Sent ' + SolveSize(B.F2T) + ' Received ' + SolveSize(B.T2F) +
-									(null == B.Connected ? '' :
+									(!WR.Has('Connected',B) ? '' :
 										' Average ' + SolveSpeed(B.F2T,B.Duration) +
 										' ' + SolveSpeed(B.T2F,B.Duration)),
 								B.Err,
