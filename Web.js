@@ -32,7 +32,11 @@
 
 	OnTick = WW.BusS(),
 
-	SolveSize = function(Q){return null == Q ? '-' : WR.ToSize(Q) + ' (' + Q + ')'},
+	SolveSize = function(Q,S)
+	{
+		S && (Q = WR.Has(S,Q) ? Q[S] : null)
+		return null == Q ? '-' : WR.ToSize(Q) + ' (' + Q + ')'
+	},
 	SolveSpeed = function(Q,S){return WR.ToSize(1E3 * Q / (S || 1)) + '/s'},
 
 	LogEnabled = false,
@@ -46,6 +50,10 @@
 		{
 			LogEnabled = !LogEnabled
 			return 'Log is ' + (LogEnabled ? 'on' : 'off')
+		},
+		Cut : function()
+		{
+			WS.F()
 		}
 	},
 
@@ -685,8 +693,8 @@
 			OnRec = function()
 			{
 				Stat
-					.S(SolveSize(LinkData.F2T))
-					.C(SolveSize(LinkData.T2F))
+					.S(SolveSize(LinkData,'F2T'))
+					.C(SolveSize(LinkData,'T2F'))
 			},
 			OnInd = function()
 			{
@@ -703,7 +711,7 @@
 						.B(WW.StrDate(Q.Birth))
 						.V(Q.Visit)
 						.U(Q.Using)
-						.F(null == Q.Last ? '-' : WW.StrDate(Q.Last))
+						.F(WR.Has('Last',Q) ? WW.StrDate(Q.Last) : '-')
 					OnOF()
 					OnTarget()
 					OnRec()
@@ -1173,8 +1181,8 @@
 				OnRec = function()
 				{
 					Stat
-						.S(SolveSize(PoolData.F2T))
-						.C(SolveSize(PoolData.T2F))
+						.S(SolveSize(PoolData,'F2T'))
+						.C(SolveSize(PoolData,'T2F'))
 				};
 				WV.ApR(
 				[
@@ -1482,7 +1490,7 @@
 									' Connected ' + (!WR.Has('Connected',B) ? '-' :
 										'+' + (B.Connected < 1E3 + B.Birth ? B.Connected - B.Birth + 'ms' : WW.StrMS(B.Connected - B.Birth,true))) +
 									' Duration ' + WW.StrMS(B.Duration,true),
-								'Sent ' + SolveSize(B.F2T) + ' Received ' + SolveSize(B.T2F) +
+								'Sent ' + SolveSize(B,'F2T') + ' Received ' + SolveSize(B,'T2F') +
 									(!WR.Has('Connected',B) ? '' :
 										' Average ' + SolveSpeed(B.F2T,B.Duration) +
 										' ' + SolveSpeed(B.T2F,B.Duration)),
