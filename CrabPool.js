@@ -2168,7 +2168,7 @@ module.exports = Option =>
 
 			[Proto.PoolNm] : WithInit(Forward(Proto.PoolNm,OnPoolNm)),
 			[Proto.PoolDes] : WithInit(Forward(Proto.PoolDes,OnPoolDes)),
-			[Proto.PoolDel] : WithInit(Data => OpPoolDel(Sec,Data)),
+			[Proto.PoolDel] : WithInit(Forward(Proto.PoolDel,Data => OpPoolDel(Sec,Data))),
 
 			[Proto.LinkNew] : WithInit(OnLink(Data => OpLinkNew(Sec,Data))),
 			[Proto.LinkOn] : WithInit(OnLinkOn),
