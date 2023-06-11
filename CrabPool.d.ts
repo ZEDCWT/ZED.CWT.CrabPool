@@ -14,6 +14,7 @@ declare module CrabPoolNS
 			Tick? : number
 			Data? : string
 			Log? : ((...Q : any[]) => any) | false
+			RecordByte? : number
 		}) : {
 			Exp<U extends import('express').Router>(Express? : U) : U
 			/**WS.on('connection')*/
@@ -69,7 +70,7 @@ declare module CrabPoolNS
 			RecClient(Q : {Row : number,Client : string}) : AnyP
 			RecServer(Q : {Row : number,Server : string}) : AnyP
 			RecCon(Q : {Row : number,At : number}) : AnyP
-			RecRec(Q : {Row : number,Duration : number,F2T : number,T2F : number}) : AnyP
+			RecRec(Q : {Row : number,Duration : number,F2T : number,T2F : number,Head : WishNS.Buff}) : AnyP
 			RecOff(Row : number) : AnyP
 			RecErr(Q : {Row : number,Err : string}) : AnyP
 			RecCount() : WishNS.Provider<number>
@@ -173,6 +174,7 @@ declare module CrabPoolNS
 		Err? : string
 		Server? : string
 		Ind? : number
+		Head? : WishNS.ByteArr
 	}
 	interface Stat
 	{

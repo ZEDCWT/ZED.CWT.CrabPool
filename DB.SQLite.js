@@ -198,6 +198,7 @@ module.exports = Option =>
 				['Rec','Server text'],
 				['Rec','Ind integer'],
 				['Pool','Plat text'],
+				['Rec','Head blob'],
 			]).FMapO(1,([V,B]) => Ignore(`alter table ${V} add ${B}`))
 				.Fin()),
 
@@ -275,7 +276,7 @@ module.exports = Option =>
 			Link : MakeLink('Link'),
 
 			RecMax : () => Get(`select max(Row) Max from Rec`).Map(B => B.Max),
-			RecNew : Q => Run(`insert into Rec values(?,9,?,null,null,?,?,?,null,null,?,null,?,?)`,
+			RecNew : Q => Run(`insert into Rec values(?,9,?,null,null,?,?,?,null,null,?,null,?,?,null)`,
 				[Q.Row,Q.Birth,Q.From,Q.To,Q.Req,Q.Client,Q.Server,Q.Ind ? 9 : null]),
 			RecClient : Q => Run(`update Rec set Client = ? where ? = Row`,[Q.Client,Q.Row]),
 			RecServer : Q => Run(`update Rec set Server = ? where ? = Row`,[Q.Server,Q.Row]),
@@ -293,9 +294,10 @@ module.exports = Option =>
 				update Rec set
 					Duration = ?,
 					F2T = ?,
-					T2F = ?
+					T2F = ?,
+					Head = ?
 				where ? = Row
-			`,[Q.Duration,Q.F2T,Q.T2F,Q.Row]),
+			`,[Q.Duration,Q.F2T,Q.T2F,Q.Head,Q.Row]),
 			RecOff : Q => Run(`update Rec set Online = 0 where ? = Row`,[Q]),
 			RecErr : Q => Run(`update Rec set Err = ? where ? = Row`,[Q.Err,Q.Row]),
 			RecCount : () => Get('select count(*) Count from Rec').Map(B => B.Count),

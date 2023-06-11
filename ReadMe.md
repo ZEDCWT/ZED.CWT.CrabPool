@@ -84,6 +84,7 @@ You can also use it as an `Express.Router` and mount it to any path you like on 
 	+ `Timeout` : `number` Optional. Default `2 * Tick`ms. Time to wait to shutdown an inactive connection.
 	+ `Data` : `string` Optional. Path to store settings, logs and other files. See [Data Folder Structure](#data-folder-structure)
 	+ `Log` : `(...Q : any[]) => any` Optional. Control how should `CrabPool` logs.
+	+ `RecordByte` : `number` Optional. Default `0`. Record first few bytes of the communications of each link.
 + Returns : `Object`
 	+ `Exp` : `(Express? : import('express').Router) => import('express').Router`. Given an optional `Express.Router` object, returns the Router. See [Example : Custom Web Server][ExWeb]
 	+ `Soc` : `(S : import('ws'),H : import('http').IncomingMessage) => any`. Used to handle event `import('ws')::on('connection')`. See [Example : Custom Web Server][ExWeb]

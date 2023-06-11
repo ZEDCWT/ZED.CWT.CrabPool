@@ -1454,6 +1454,7 @@
 					Card = WV.Rock(ClassCard + ' ' + WV.FmtW + ' ' + WV.S4,'fieldset'),
 					Index = WV.A('legend'),
 					Desc = WV.Rock(),
+					Communication = WV.Rock(),
 					Cut = WV.But(
 					{
 						X : 'Disconnect',
@@ -1470,8 +1471,27 @@
 									LoadRec()
 							})
 						}
-					});
-					WV.ApR([Index,Desc],Card)
+					}),
+					SolveHead = function(Q)
+					{
+						var
+						Tag = 9,
+						T,F = 0;
+						for (;Tag && F < Q.length;)
+						{
+							Tag = 0
+							T = 1
+							for (;F < Q.length && (Tag += T * (127 & Q[F]),127 < Q[F++]);) T *= 128
+							if (Tag && F < Q.length)
+							{
+								T = WC.Slice(Q,F,F += WR.Floor(Tag / 2))
+								WV.Ap(WV.X(1 & Tag ? 'Received' : 'Sent'),Communication)
+								WV.Ap(WV.X(WC.HEXS(T)),Communication)
+								WV.Ap(WV.X(WC.U16S(T)),Communication)
+							}
+						}
+					};
+					WV.ApR([Index,Desc,Communication],Card)
 					WV.Ap(Card,V)
 					return {
 						U : function(/**@type {CrabPoolNS.Rec}*/ B)
@@ -1496,6 +1516,8 @@
 										' ' + SolveSpeed(B.T2F,B.Duration)),
 								B.Err,
 							]).join('\n'))
+							WV.Clr(Communication)
+							B.Head && SolveHead(B.Head)
 						}
 					}
 				}

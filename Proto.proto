@@ -262,6 +262,7 @@ message Rec
 	string Err = 12;
 	string Server = 13;
 	uint64 Ind = 14;
+	bytes Head = 15;
 }
 
 message RecReq

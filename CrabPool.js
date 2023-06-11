@@ -130,6 +130,7 @@ module.exports = Option =>
 	LogRoll,
 	LogTop = Option.Log,
 	MakeLog,
+	RecordByte = Option.RecordByte,
 
 	FileID = WN.JoinP(PathData,'ID'),
 	FileToken = WN.JoinP(PathData,'Key'),
@@ -670,10 +671,13 @@ module.exports = Option =>
 		Pause ? Sec.S.pause() : Sec.S.resume(),
 	AuxMakeRecKeyFin = 0,
 	AuxMakeRecKeyIO = 1,
-	AuxMakeRec = (ID,Begin,Link) =>
+	AuxMakeRec = (ID,Begin,Link,IsPipePipe) =>
 	{
 		var
 		IO = [0,0],IOLink = [0,0],
+		Head = RecordByte ? WC.Buff(RecordByte) : null,
+		HeadOffset = 0,
+		D,
 		Save = () =>
 		{
 			OnRecRec(
@@ -682,6 +686,11 @@ module.exports = Option =>
 				Duration : WW.Now() - Begin,
 				F2T : IO[0],
 				T2F : IO[1],
+				Head : HeadOffset ?
+					HeadOffset < RecordByte ?
+						WC.Slice(Head,0,HeadOffset) :
+						Head :
+					null,
 			})
 			if (Link && IOLink[0] + IOLink[1])
 			{
@@ -698,6 +707,8 @@ module.exports = Option =>
 					Int.F()
 					Save()
 					OnRecOff(ID)
+					Head =
+					D =
 					Link =
 					IO =
 					IOLink =
@@ -706,8 +717,27 @@ module.exports = Option =>
 			},
 			(Dir,Q) =>
 			{
-				IO[Dir] += Q
-				IOLink[Dir] += Q
+				IO[Dir] += Q.length
+				IOLink[Dir] += Q.length
+				if (RecordByte && HeadOffset < RecordByte && Q.length)
+				{
+					if (IsPipePipe)
+					{
+						D || (D = [null,null])
+						D[Dir] || (D[Dir] = MakeDecipher())
+						Q = D[Dir](Q)
+					}
+					Dir += 2 * Q.length
+					for (;HeadOffset < RecordByte && (Dir = (Dir - (Head[HeadOffset++] = Dir % 128)) / 128);)
+						Head[HeadOffset - 1] |= 128
+					HeadOffset < RecordByte &&
+						Head.set(RecordByte < HeadOffset + Q.length ?
+							WC.Slice(Q,0,RecordByte - HeadOffset) :
+							Q,HeadOffset)
+					HeadOffset += Q.length
+					if (RecordByte <= HeadOffset)
+						D = null
+				}
 			},
 		]
 	},
@@ -759,11 +789,11 @@ module.exports = Option =>
 		};
 		SocQ.on('error',E => RecErr[AuxMakeRecErrKeyRec](E,AuxMakeRecErrSideClient))
 			.on('close',() => Fin())
-			.on('data',Q => Rec && Rec[AuxMakeRecKeyIO](0,Q.length))
+			.on('data',Q => Rec && Rec[AuxMakeRecKeyIO](0,Q))
 			.pipe(SocS)
 		SocS.on('error',E => RecErr[AuxMakeRecErrKeyRec](E,AuxMakeRecErrSideServer))
 			.on('close',() => Fin())
-			.on('data',Q => Rec && Rec[AuxMakeRecKeyIO](1,Q.length))
+			.on('data',Q => Rec && Rec[AuxMakeRecKeyIO](1,Q))
 			.pipe(SocQ)
 		AuxPool.set(ID,
 		[
@@ -829,7 +859,7 @@ module.exports = Option =>
 			'close',() => Fin(),
 			'data',Q =>
 			{
-				Rec[AuxMakeRecKeyIO](RawIsFrom ? 0 : 1,Q.length)
+				Rec[AuxMakeRecKeyIO](RawIsFrom ? 0 : 1,Q)
 				AuxPipeData(Sec,AuxID,C(Q))
 			},
 			'end',() => AuxPipeEnd(Sec,AuxID),
@@ -845,8 +875,9 @@ module.exports = Option =>
 			{
 				if (S === Sec)
 				{
-					Rec[AuxMakeRecKeyIO](RawIsFrom ? 1 : 0,Q.length)
-					if (!Soc.write(D(Q)) && !Paused)
+					Q = D(Q)
+					Rec[AuxMakeRecKeyIO](RawIsFrom ? 1 : 0,Q)
+					if (!Soc.write(Q) && !Paused)
 						AuxPipePR(Sec,AuxID,Paused = true)
 				}
 			},
@@ -860,7 +891,7 @@ module.exports = Option =>
 		var
 		PRQ = AuxMakePR(SecQ,AuxIDQ,P => AuxPipePR(SecS,AuxIDS,P)),
 		PRS = AuxMakePR(SecS,AuxIDS,P => AuxPipePR(SecQ,AuxIDQ,P)),
-		Rec = AuxMakeRec(ID,Begin),
+		Rec = AuxMakeRec(ID,Begin,null,true),
 		RecErr = AuxMakeRecErr(ID),
 		Fin = (S,E) =>
 		{
@@ -895,12 +926,12 @@ module.exports = Option =>
 			{
 				if (S === SecQ)
 				{
-					Rec[AuxMakeRecKeyIO](0,Q.length)
+					Rec[AuxMakeRecKeyIO](0,Q)
 					AuxPipeData(SecS,AuxIDS,Q)
 				}
 				else if (S === SecS)
 				{
-					Rec[AuxMakeRecKeyIO](1,Q.length)
+					Rec[AuxMakeRecKeyIO](1,Q)
 					AuxPipeData(SecQ,AuxIDQ,Q)
 				}
 			},
