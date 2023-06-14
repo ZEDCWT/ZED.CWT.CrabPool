@@ -30,6 +30,17 @@
 	StoreGet = function(Q){return WB.StoG(StoreKey + Q)},
 	StoreSet = function(Q,S){return WB.StoS(StoreKey + Q,S)},
 
+	Copy = function(Q)
+	{
+		WV.Copy(Q).Now(function(B)
+		{
+			Noti.S(false === B ? 'Failed to copy' : 'Copied')
+		},function(E)
+		{
+			Noti.S('Failed to copy | ' + E)
+		})
+	},
+
 	OnTick = WW.BusS(),
 
 	SolveSize = function(Q,S)
@@ -1369,6 +1380,7 @@
 		{
 			var
 			ClassHint = WW.Key(),
+			ClassLabel = WW.Key(),
 
 			Page = 0,PageLoading,
 			PageSize = 20,
@@ -1454,7 +1466,12 @@
 					Card = WV.Rock(ClassCard + ' ' + WV.FmtW + ' ' + WV.S4,'fieldset'),
 					Index = WV.A('legend'),
 					Desc = WV.Rock(),
-					Communication = WV.Rock(),
+					Head = WV.Rock(),
+					Communication = WV.ApR(
+					[
+						WV.T(WV.Rock(ClassLabel),'Initial Communication'),
+						Head
+					],WV.Rock()),
 					Cut = WV.But(
 					{
 						X : 'Disconnect',
@@ -1472,12 +1489,149 @@
 							})
 						}
 					}),
-					SolveHead = function(Q)
+					MakeLabel = function(Q)
+					{
+						return {
+							Type : 'Label',
+							Val : Q
+						}
+					},
+					DescCurrent = [],
+					DescApply = function(Q)
 					{
 						var
-						Tag = 9,
+						IsLabel,
+						Val,
 						T,F = 0;
-						for (;Tag && F < Q.length;)
+						for (;F < Q.length;++F)
+						{
+							IsLabel = WW.IsObj(Q[F])
+							Val = IsLabel ? Q[F].Val : Q[F]
+							if (F < DescCurrent.length && DescCurrent[F].IsLabel === IsLabel)
+								Val === WV.T(DescCurrent[F].Val) || WV.T(DescCurrent[F].Val,Val)
+							else
+							{
+								T = IsLabel ?
+									WV.T(WV.Rock(ClassLabel,'span'),Val) :
+									WV.E(Val)
+								F ?
+									WV.After(T,DescCurrent[~-F].Val) :
+									WV.Ap(T,Desc)
+								T =
+								{
+									IsLabel : IsLabel,
+									Val : T
+								}
+								F < DescCurrent.length ?
+									DescCurrent.splice(F,0,T) :
+									DescCurrent.push(T)
+							}
+						}
+						for (;F < DescCurrent.length;)
+							WV.Del(DescCurrent.pop().Val)
+					},
+					HeadCurrent = [],
+					HeadApply = function(Q)
+					{
+						var
+						CharIsPrintable = function(Q)
+						{
+							return 9 === Q ||
+								10 === Q ||
+								13 === Q ||
+								31 < Q && Q < 127
+						},
+						CharIsPrintableMono = function(Q){return 31 < Q && Q < 127},
+						MakeMessage = function()
+						{
+							var
+							CurrentTag,
+							CurrentContent,
+							CurrentContentHEX,
+
+							TagDir = WV.Rock(ClassLabel,'span'),
+							TagLength = WV.E(),
+							LineTag = WV.ApR(
+							[
+								TagDir,
+								TagLength,
+								WV.But(
+								{
+									X : 'Copy As UTF8 Text',
+									The : WV.TheP,
+									C : function()
+									{
+										Copy(WC.U16S(CurrentContent))
+									}
+								}),
+								WV.But(
+								{
+									X : 'Copy As HEX',
+									The : WV.TheP,
+									C : function()
+									{
+										Copy(CurrentContentHEX)
+									}
+								}),
+								WV.But(
+								{
+									X : 'Copy As Base64',
+									The : WV.TheP,
+									C : function()
+									{
+										Copy(WC.B64S(CurrentContent))
+									}
+								})
+							],WV.Rock()),
+							LineContent = WV.Rock(WV.FontM,'code');
+							WV.ApR([LineTag,LineContent],Head)
+							return function(Tag,Content)
+							{
+								if (false === Tag)
+								{
+									WV.Del(LineContent)
+									WV.Del(LineTag)
+								}
+								else
+								{
+									if (CurrentTag !== (CurrentTag = Tag))
+									{
+										WV.T(TagDir,1 & Tag ? 'Received ' : 'Sent ')
+										WV.T(TagLength,WW.Quo(WR.Floor(Tag / 2)) +
+											(Content.length < WR.Floor(Tag / 2) ? '(Truncated to ' + Content.length + ') ' : ''))
+									}
+									if (CurrentContentHEX !== (CurrentContentHEX = WC.HEXS(Content)))
+									{
+										CurrentContent = Content
+										if (WR.All(CharIsPrintable,CurrentContent))
+											Content = WC.U8S(Content)
+										else
+											Content = WR.MapU(function(V,F)
+											{
+												var
+												R = '';
+												WR.Each(function(B)
+												{
+													R += CharIsPrintableMono(B) ? WR.CHR(B) : '.'
+												},V)
+												if (R.length < 16)
+													R = WR.PadE(' ',16,R)
+												R += ' | ' + WR.PadS0(8,WR.Up(WR.HEX(16 * F))) + ' |'
+												WR.EachU(function(B,G)
+												{
+													R += (G && G % 4 < 1 ? ' ' : '') +
+														' ' + WW.Pad02(WR.Up(WR.HEX(B)))
+												},V)
+												return R
+											},WR.SplitAll(16,Content)).join('\n')
+										WV.T(LineContent,Content)
+									}
+								}
+							}
+						},
+						Tag = 9,
+						T,F = 0,G = 0;
+						for (;Tag && F < Q.length;++G)
 						{
 							Tag = 0
 							T = 1
@@ -1485,11 +1639,13 @@
 							if (Tag && F < Q.length)
 							{
 								T = WC.Slice(Q,F,F += WR.Floor(Tag / 2))
-								WV.Ap(WV.X(1 & Tag ? 'Received' : 'Sent'),Communication)
-								WV.Ap(WV.X(WC.HEXS(T)),Communication)
-								WV.Ap(WV.X(WC.U16S(T)),Communication)
+								if (HeadCurrent.length <= G)
+									HeadCurrent.push(MakeMessage())
+								HeadCurrent[G](Tag,T)
 							}
 						}
+						for (;G < HeadCurrent.length;)
+							HeadCurrent.pop()(false)
 					};
 					WV.ApR([Index,Desc,Communication],Card)
 					WV.Ap(Card,V)
@@ -1498,26 +1654,44 @@
 						{
 							WV.T(Index,'#' + B.Row)
 							B.Online && WV.Ap(Cut.R,Index)
-							WV.T(Desc,WR.Where(WR.Id,
+							DescApply(WR.Flatten(
 							[
-								'From ' + PoolShowRow(B.HostFrom) +
-									(B.Client ? ' (' + B.Client + ')' : ''),
-								'To ' + PoolShowRow(B.HostTo) +
-									(B.Server ? ' (' + B.Server + ')' : ''),
-								(B.Ind ? '[Independent] ' : '') +
-									'Address ' + B.Req,
-								'Created ' + WW.StrDate(B.Birth) +
-									' Connected ' + (!WR.Has('Connected',B) ? '-' :
-										'+' + (B.Connected < 1E3 + B.Birth ? B.Connected - B.Birth + 'ms' : WW.StrMS(B.Connected - B.Birth,true))) +
-									' Duration ' + WW.StrMS(B.Duration,true),
-								'Sent ' + SolveSize(B,'F2T') + ' Received ' + SolveSize(B,'T2F') +
-									(!WR.Has('Connected',B) ? '' :
-										' Average ' + SolveSpeed(B.F2T,B.Duration) +
-										' ' + SolveSpeed(B.T2F,B.Duration)),
-								B.Err,
-							]).join('\n'))
-							WV.Clr(Communication)
-							B.Head && SolveHead(B.Head)
+								MakeLabel('From '),
+								PoolShowRow(B.HostFrom),
+								B.Client ? WW.QuoP(B.Client) : '',
+								'\n',
+								MakeLabel('To '),
+								PoolShowRow(B.HostTo),
+								B.Server ? WW.QuoP(B.Server) : '',
+								'\n',
+								MakeLabel((B.Ind ? '[Independent] ' : '') + 'Address '),
+								B.Req,
+								'\n',
+								MakeLabel('Created '),
+								WW.StrDate(B.Birth),
+								!WR.Has('Connected',B) ? [] :
+								[
+									MakeLabel(' Connected '),
+									'+' + (B.Connected < 1E3 + B.Birth ? B.Connected - B.Birth + 'ms' : WW.StrMS(B.Connected - B.Birth,true)),
+									MakeLabel(' Duration '),
+									WW.StrMS(B.Duration,true),
+									'\n',
+									MakeLabel('Sent '),
+									SolveSize(B,'F2T'),
+									MakeLabel(' Received '),
+									SolveSize(B,'T2F'),
+									MakeLabel(' Average '),
+									SolveSpeed(B.F2T,B.Duration) + ' ' + SolveSpeed(B.T2F,B.Duration)
+								],
+								'\n',
+								B.Err
+							]))
+							if (B.Head)
+							{
+								WV.ClsR(Communication,WV.None)
+								HeadApply(B.Head)
+							}
+							else WV.ClsA(Communication,WV.None)
 						}
 					}
 				}
@@ -1565,11 +1739,14 @@
 					return WW.Fmt
 					(
 						'#`R` .`C`{margin:20px 0}' +
-						'.`H`{text-align:center}',
+						'#`R` .`C` code{display:block;margin:4px}' +
+						'.`H`{text-align:center}' +
+						'.`L`{color:#2672EC}',
 						{
 							R : ID,
 							C : ClassCard,
-							H : ClassHint
+							H : ClassHint,
+							L : ClassLabel
 						}
 					)
 				},
