@@ -676,7 +676,7 @@ module.exports = Option =>
 		var
 		IO = [0,0],IOLink = [0,0],
 		Head = RecordByte ? WC.Buff(RecordByte) : null,
-		HeadOffset = 0,
+		HeadLen = 0,HeadOffset = 0,
 		D,
 		Save = () =>
 		{
@@ -686,9 +686,9 @@ module.exports = Option =>
 				Duration : WW.Now() - Begin,
 				F2T : IO[0],
 				T2F : IO[1],
-				Head : HeadOffset ?
-					HeadOffset < RecordByte ?
-						WC.Slice(Head,0,HeadOffset) :
+				Head : HeadLen ?
+					HeadLen < RecordByte ?
+						WC.Slice(Head,0,HeadLen) :
 						Head :
 					null,
 			})
@@ -730,11 +730,13 @@ module.exports = Option =>
 					Dir += 2 * Q.length
 					for (;HeadOffset < RecordByte && (Dir = (Dir - (Head[HeadOffset++] = Dir % 128)) / 128);)
 						Head[HeadOffset - 1] |= 128
-					HeadOffset < RecordByte &&
+					if (HeadOffset < RecordByte)
+					{
 						Head.set(RecordByte < HeadOffset + Q.length ?
 							WC.Slice(Q,0,RecordByte - HeadOffset) :
 							Q,HeadOffset)
-					HeadOffset += Q.length
+						HeadLen = HeadOffset += Q.length
+					}
 					if (RecordByte <= HeadOffset)
 						D = null
 				}

@@ -1686,7 +1686,7 @@
 								'\n',
 								B.Err
 							]))
-							if (B.Head)
+							if (WR.Has('Head',B))
 							{
 								WV.ClsR(Communication,WV.None)
 								HeadApply(B.Head)
